@@ -12,7 +12,35 @@ Aplicación web para la gestión de una instancia de [LinFBB](https://sourceforg
 
 ### Etapa 2 (futuro)
 
-- Gestión de la instancia FBB: estado, configuración, usuarios, logs.
+- Información de la aplicación
+    - Referencias al proyecto LinFBB
+    - Versión
+    - Licencia
+    - Repositorio de la aplicación
+- Información del BBS
+- Lista de mensajes
+    - Ordenar por columnas
+    - Scroll infinito
+- Mensajería
+    - Responder, responder por privado, reenviar, etc
+    - Envío de archivos (conversión a 7+)
+- Historial de mensajes leídos + Filtrado por "no leídos"
+- 7+
+    - Descargar
+    - Abrir haciendo clic en la imágen
+    - ...
+- Terminal
+    - Aplicación Web <-> Backend <-> Telnet <-> LinFBB (?)
+- API
+
+### Etapa 3 (futuro)
+
+- Gestión de la instancia FBB
+    - SysOp
+        - Configuración
+        - ADB de usuarios
+        - logs
+        - ...
 
 ## Arquitectura
 
