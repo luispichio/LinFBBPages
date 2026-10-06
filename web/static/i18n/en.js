@@ -53,7 +53,7 @@ window.LIN_FBB_I18N.en = {
   "files.auxiliary": "Auxiliary files",
   "errors.generic": "Something went wrong. Please try again.",
   "errors.session": "Your session expired. Please sign in again.",
-  "errors.login": "Incorrect callsign or password.",
+  "errors.login": "Incorrect username or password.",
   "notices.sent": "Message queued. FBB will process it in approximately one minute.",
   "notices.welcome": "Signed in.",
   "notices.loggedOut": "Signed out.",

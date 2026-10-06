@@ -59,11 +59,11 @@
     } catch (_) {
       data = {};
     }
-    if (response.status === 401) {
-      throw Object.assign(new Error(translate("errors.session")), { sessionExpired: true });
+    if (response.status === 401 && path !== "/api/login") {
+      throw Object.assign(new Error(translate("errors.session")), { sessionExpired: true, status: 401 });
     }
     if (!response.ok) {
-      throw new Error(data.error || translate("errors.generic"));
+      throw Object.assign(new Error(data.error || translate("errors.generic")), { status: response.status });
     }
     return data;
   }
@@ -162,7 +162,8 @@
       showApp(data.user);
       showBanner("#app-notice", translate("notices.welcome"));
     } catch (error) {
-      showBanner("#login-error", error.message || translate("errors.login"));
+      const message = error.status === 401 ? translate("errors.login") : (error.message || translate("errors.generic"));
+      showBanner("#login-error", message);
     }
   }
 

@@ -53,7 +53,7 @@ window.LIN_FBB_I18N.es = {
   "files.auxiliary": "Archivos auxiliares",
   "errors.generic": "Ocurrió un error. Intentá nuevamente.",
   "errors.session": "La sesión expiró. Volvé a ingresar.",
-  "errors.login": "Callsign o contraseña incorrectos.",
+  "errors.login": "Usuario o contraseña incorrectos.",
   "notices.sent": "Mensaje encolado. FBB lo procesará aproximadamente en un minuto.",
   "notices.welcome": "Sesión iniciada.",
   "notices.loggedOut": "Sesión cerrada.",
