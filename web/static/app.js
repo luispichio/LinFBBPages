@@ -150,14 +150,15 @@
   async function login(event) {
     event.preventDefault();
     hideBanner("#login-error");
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       const data = await request("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept": "application/json" },
         body: JSON.stringify({ callsign: form.get("callsign"), password: form.get("password") })
       });
-      event.currentTarget.reset();
+      formElement.reset();
       showApp(data.user);
       showBanner("#app-notice", translate("notices.welcome"));
     } catch (error) {
@@ -260,7 +261,8 @@
   async function submitCompose(event) {
     event.preventDefault();
     hideBanner("#compose-error");
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       const data = await request("/api/messages", {
         method: "POST",
@@ -273,7 +275,7 @@
           body: form.get("body")
         })
       });
-      event.currentTarget.reset();
+      formElement.reset();
       showBanner("#app-notice", data.message || translate("notices.sent"));
       setView("messages-view");
     } catch (error) {
