@@ -1,62 +1,62 @@
 # AGENTS.md — LinFBBPages
 
-Contexto para agentes que trabajen en este repositorio. Leer completo antes de modificar código.
+Context for agents working in this repository. Read this file completely before modifying code.
 
-## Qué es este proyecto
+## What this project is
 
-Aplicación web para gestionar una instancia de [LinFBB](https://sourceforge.net/projects/linfbb/) (BBS de packet radio) que corre en el mismo host (o contenedor con filesystem compartido). Etapa 1: login, visualización/redacción de mensajes y visualización de archivos decodificados 7+. Etapa 2 (futura): gestión de la instancia.
+Web application for managing a [LinFBB](https://sourceforge.net/projects/linfbb/) instance (packet-radio BBS) running on the same host (or in a container with a shared filesystem). Stage 1: login, message viewing/composition, and viewing decoded 7+ files. Stage 2 (future): instance management.
 
-El backend **lee directamente los archivos binarios de datos de FBB**. La corrección de los parsers es lo más crítico del proyecto.
+The backend **reads FBB data binary files directly**. Parser correctness is the most critical part of this project.
 
-## Stack y restricciones
+## Stack and constraints
 
-- **Backend**: Go, **solo biblioteca estándar** (`net/http`, `encoding/binary`, `embed`, `crypto/rand`, ...). No agregar dependencias externas sin aprobación explícita del usuario. Target: hardware modesto (1 GHz / 512 MB RAM).
-- **Frontend**: HTML/CSS/JS vanilla en `web/static/`, **sin build step ni npm**, embebido con `go:embed`. i18n ES/EN mediante diccionarios JS (`web/static/i18n/es.js`, `en.js`); idioma default ES, detección por `navigator.language`.
-- **Sesiones**: en memoria (mapa token→usuario con expiración), cookie httpOnly `SameSite=Lax`, token de 32 bytes de `crypto/rand`. No persistir sesiones en disco.
+- **Backend**: Go, **standard library only** (`net/http`, `encoding/binary`, `embed`, `crypto/rand`, ...). Do not add external dependencies without the user's explicit approval. Target hardware: modest systems (1 GHz / 512 MB RAM).
+- **Frontend**: vanilla HTML/CSS/JS in `web/static/`, **no build step or npm**, embedded with `go:embed`. ES/EN i18n through JavaScript dictionaries (`web/static/i18n/es.js`, `en.js`); default language ES, detected from `navigator.language`.
+- **Sessions**: in memory (token-to-user map with expiration), an httpOnly `SameSite=Lax` cookie, and a 32-byte `crypto/rand` token. Do not persist sessions to disk.
 
-## Estructura del repositorio
+## Repository structure
 
 ```
-├── cmd/linfbbpages/   # main.go: config, wiring, servidor HTTP
+├── cmd/linfbbpages/   # main.go: config, wiring, HTTP server
 ├── internal/
 │   ├── fbb/           # parsers: inf.go, dirmes.go, mail.go, sevenplus.go (+ _test.go)
-│   ├── api/           # handlers HTTP, auth, sesiones
-│   └── config/        # flags + variables de entorno
-├── web/static/        # frontend embebido
-└── design/            # NO TOCAR: docs de formatos FBB + fixtures para tests/dev
+│   ├── api/           # HTTP handlers, authentication, sessions
+│   └── config/        # flags + environment variables
+├── web/static/        # embedded frontend
+└── design/            # DO NOT TOUCH: FBB format documentation + test/development fixtures
 ```
 
-## Comandos
+## Commands
 
 ```sh
-CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o linfbbpages ./cmd/linfbbpages # compilar
+CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o linfbbpages ./cmd/linfbbpages # build
 go test ./...                                # tests
-go vet ./...                                 # lint básico
+go vet ./...                                 # basic lint
 
-# Dev contra fixtures (¡están en formato 32 bits!):
+# Development against fixtures (they use the 32-bit format!):
 CGO_ENABLED=0 go run ./cmd/linfbbpages --fbb-dir design/usr/local/var/ax25/fbb --fbb-arch 32
 ```
 
-## Formatos de archivos de FBB
+## FBB file formats
 
-Documentación original en `design/docs/` (`fmtinf.html`, `fmtdirme.html`, `fmtmail.html`). Los fixtures reales están en `design/usr/local/var/ax25/fbb/`.
+Original documentation is in `design/docs/` (`fmtinf.html`, `fmtdirme.html`, `fmtmail.html`). Real fixtures are in `design/usr/local/var/ax25/fbb/`.
 
-### Reglas generales
+### General rules
 
-- Strings de C: terminar en el primer byte NUL (`00`); descartar el resto del campo.
-- Enteros: **little-endian**. Fechas: segundos desde 1970-01-01 00:00 UTC (Unix epoch).
-- `long` de C = 4 bytes en builds de 32 bits, 8 bytes en builds de 64 bits (con alineación a 8 → padding). El layout se selecciona con `--fbb-arch` (`auto`|`32`|`64`, default `auto`) y los parsers deben ser **table-driven** a partir de un tipo `Layout`: prohibido hardcodear offsets fuera de la definición del layout.
-- Los archivos pueden cambiar mientras FBB corre: cachear parseos por **mtime** y releer al cambiar. Nunca mantener handles abiertos.
-- Nota histórica: la doc declara `flags`/`on_base` como `unsigned`, pero el fixture valida que ocupan **2 bytes** (2880 = 8×360 y `pass` encontrado en offset 338).
+- C strings: end at the first NUL byte (`00`); discard the rest of the field.
+- Integers: **little-endian**. Dates: seconds since 1970-01-01 00:00 UTC (Unix epoch).
+- C `long` = 4 bytes in 32-bit builds, 8 bytes in 64-bit builds (with 8-byte alignment and padding). The layout is selected with `--fbb-arch` (`auto`|`32`|`64`, default `auto`), and parsers must be **table-driven** from a `Layout` type: hardcoding offsets outside the layout definition is forbidden.
+- Files can change while FBB is running: cache parsed data by **mtime** and reread when it changes. Never keep file handles open.
+- Historical note: the documentation declares `flags`/`on_base` as `unsigned`, but the fixture confirms they occupy **2 bytes** (2880 = 8×360 and `pass` is found at offset 338).
 
-### `inf.sys` — usuarios (login)
+### `inf.sys` — users (login)
 
-Registros de tamaño fijo, **sin header**. Tamaño del archivo % tamaño de registro == 0. Login = callsign (case-insensitive) con `pass` no vacío que coincida.
+Fixed-size records, **without a header**. File size must be divisible by the record size. Login = case-insensitive callsign with a non-empty matching `pass`.
 
-| Campo | Tamaño | Offset (32 bits, reg=360) | Offset (64 bits, reg=384) |
+| Field | Size | Offset (32-bit, record=360) | Offset (64-bit, record=384) |
 |---|---|---|---|
 | `indic` (callsign[7]+ssid) | 8 | 0 | 0 |
-| `relai[8]` (path digis) | 64 | 8 | 8 |
+| `relai[8]` (digipeater path) | 64 | 8 | 8 |
 | `lastmes` | long | 72 | 72 |
 | `nbcon` | long | 76 | 80 |
 | `hcon` | long | 80 | 88 |
@@ -82,96 +82,96 @@ Registros de tamaño fijo, **sin header**. Tamaño del archivo % tamaño de regi
 | `filtre[7]` | 7 | 325 | 353 |
 | **`pass[13]`** | 13 | **338** | **360** |
 | `zip[9]` | 9 | 351 | 373 |
-| **Total registro** | | **360** | **384** (382 + 2 tail pad) |
+| **Total record** | | **360** | **384** (382 + 2 tail pad) |
 
-### `dirmes.sys` — índice de mensajes
+### `dirmes.sys` — message index
 
-Registros de tamaño fijo. **El registro 0 es un header**: solo es válido su campo `numero` (último número de mensaje asignado). Los mensajes son los registros 1..N; un `type` NUL (`00`) invalida el registro.
+Fixed-size records. **Record 0 is a header**: only its `numero` field is valid (last assigned message number). Messages are records 1..N; a NUL `type` (`00`) invalidates a record.
 
-| Campo | Tamaño | Offset (32 bits, reg=194) | Offset (64 bits, reg=224) |
+| Field | Size | Offset (32-bit, record=194) | Offset (64-bit, record=224) |
 |---|---|---|---|
 | `type` (A,B,P,T) | 1 | 0 | 0 |
 | `status` ($,A,F,K,N,Y) | 1 | 1 | 1 |
 | _(padding)_ | — | — | 2–7 |
 | `numero` | long | 2 | 8 |
-| `taille` (tamaño del cuerpo) | long | 6 | 16 |
+| `taille` (body size) | long | 6 | 16 |
 | `date` | long | 10 | 24 |
-| `bbsf[7]` (BBS que lo entregó) | 7 | 14 | 32 |
-| `bbsv[41]` (ruta) | 41 | 21 | 39 |
-| `exped[7]` (origen/from) | 7 | 62 | 80 |
-| `desti[7]` (destino/to) | 7 | 69 | 87 |
+| `bbsf[7]` (BBS that delivered it) | 7 | 14 | 32 |
+| `bbsv[41]` (route) | 41 | 21 | 39 |
+| `exped[7]` (origin/from) | 7 | 62 | 80 |
+| `desti[7]` (destination/to) | 7 | 69 | 87 |
 | `bid[13]` (BID/MID) | 13 | 76 | 94 |
-| `titre[61]` (título) | 61 | 89 | 107 |
+| `titre[61]` (title) | 61 | 89 | 107 |
 | `free[16]` | 16 | 150 | 168 |
-| `datesd` (creación) | long | 166 | 184 |
-| `datech` (último cambio status) | long | 170 | 192 |
-| `fbbs[10]` (máscara BBS a forwardear) | 10 | 174 | 200 |
-| `forw[10]` (máscara ya forwardeado) | 10 | 184 | 210 |
-| **Total registro** | | **194** | **224** (220 + 4 tail pad) |
+| `datesd` (creation) | long | 166 | 184 |
+| `datech` (last status change) | long | 170 | 192 |
+| `fbbs[10]` (BBS mask to forward to) | 10 | 174 | 200 |
+| `forw[10]` (already-forwarded mask) | 10 | 184 | 210 |
+| **Total record** | | **194** | **224** (220 + 4 tail pad) |
 
-Tipos: `B` bulletin, `P` privado, `A`/`T` menos comunes. Status: `N` nuevo, `Y` leído, `F` forwardeado, `K` killed, `A` archivado, `$` en proceso. Detalle semántico completo en `design/docs/fmtdirme.html`.
+Types: `B` bulletin, `P` private, `A`/`T` less common. Statuses: `N` new, `Y` read, `F` forwarded, `K` killed, `A` archived, `$` being processed. Full semantics are documented in `design/docs/fmtdirme.html`.
 
-### Detección de arquitectura (`--fbb-arch=auto`)
+### Architecture detection (`--fbb-arch=auto`)
 
-Al iniciar, para `inf.sys` y `dirmes.sys`:
+At startup, for `inf.sys` and `dirmes.sys`:
 
-1. Candidatos = {32, 64}; descartar el arch cuyo tamaño de registro **no** divida exactamente al tamaño del archivo (intersección de ambos archivos).
-2. Queda un candidato → ese.
-3. Quedan ambos (tamaño múltiplo de ambos registros) → asumir **64** y loguear la ambigüedad.
-4. No queda ninguno → error fatal con mensaje claro (archivo corrupto o formato desconocido).
+1. Candidates = {32, 64}; discard an architecture whose record size does **not** evenly divide the file size (intersection across both files).
+2. One candidate remains → use it.
+3. Both remain (file size is a multiple of both record sizes) → assume **64** and log the ambiguity.
+4. Neither remains → fatal error with a clear message (corrupt file or unknown format).
 
-### Cuerpos de mensajes — `mail/`
+### Message bodies — `mail/`
 
-- Archivo por mensaje: `mail/mail<N>/m_%06d.mes` donde **N = numero % 10** (validado: `m_000110` está en `mail0`).
-- Contenido texto: cero o más líneas de header de ruteo `R:AAMMDD/hhmmZ ...`, luego línea en blanco, luego el cuerpo. Parsear los `R:` como headers y el resto como texto plano.
-- `mail/mail.in` puede existir (cola de importación de FBB): **no exponerlo como mensaje**.
+- One file per message: `mail/mail<N>/m_%06d.mes` where **N = number % 10** (validated: `m_000110` is in `mail0`).
+- Text content: zero or more routing-header lines `R:AAMMDD/hhmmZ ...`, then a blank line, then the body. Parse `R:` lines as headers and the remainder as plain text.
+- `mail/mail.in` may exist (FBB import queue): **never expose it as a message**.
 
-### Envío de mensajes — `mail/mail.in`
+### Sending messages — `mail/mail.in`
 
-FBB chequea `mail/mail.in` cada minuto, importa los mensajes y **borra el archivo**. La app lo crea/agrega (con lock de archivo) con uno o más mensajes en formato:
+FBB checks `mail/mail.in` every minute, imports messages, and **deletes the file**. The application creates/appends to it (with a file lock) with one or more messages in this format:
 
 ```
-SP <destino>[@ruta] < <origen> $<BID-opcional>
-<título>
-<cuerpo...>
+SP <destination>[@route] < <source> $<optional-BID>
+<title>
+<body...>
 /EX
 ```
 
-`SP` = privado, `SB` = bulletin. Ejemplos reales en el fixture `design/usr/local/var/ax25/fbb/mail/mail.in` y doc en `design/docs/fmtmail.html`. La UI debe comunicar el delay de ~1 minuto.
+`SP` = private, `SB` = bulletin. Real examples are in the fixture `design/usr/local/var/ax25/fbb/mail/mail.in` and the documentation in `design/docs/fmtmail.html`. The UI must communicate the approximately one-minute delay.
 
-### Archivos decodificados 7+ — `7pfbb/ok/`
+### Decoded 7+ files — `7pfbb/ok/`
 
-- Archivos útiles (ej. `.jpg`) junto a metadatos por basename: `.7ix` (índice) y `.err` (reporte de errores 7PLUS). En instalaciones reales, `.7mf` puede contener directamente el payload decodificado (por ejemplo, un JPEG), por lo que se detecta por MIME y se muestra como archivo principal.
-- La vista los agrupa por basename: mostrar el archivo principal con preview si es imagen; los metadatos como metadata opcional, nunca mezclados en la galería.
-- `7pfbb/7pl_log` y las partes crudas `*.pNN` en `7pfbb/` **no** se exponen en etapa 1.
+- Useful files (e.g. `.jpg`) are stored with basename metadata: `.7ix` (index) and `.err` (7PLUS error report). In real installations, `.7mf` may contain the decoded payload directly (for example, a JPEG), so MIME detection identifies it and displays it as the main file.
+- The view groups files by basename: show the main file with a preview when it is an image; show metadata as optional auxiliary data, never mixed into the gallery.
+- `7pfbb/7pl_log` and raw `*.pNN` parts in `7pfbb/` are **not exposed** in stage 1.
 
-## API HTTP
+## HTTP API
 
-JSON, cookie de sesión en todos menos `/api/login`. Auth middleware rechaza con 401.
+JSON; a session cookie is required for every endpoint except `/api/login`. The auth middleware rejects unauthorized requests with 401.
 
-| Método | Ruta | Descripción |
+| Method | Path | Description |
 |---|---|---|
-| POST | `/api/login` | `{callsign, password}` → valida contra `inf.sys`, setea cookie. |
-| POST | `/api/logout` | Invalida la sesión. |
-| GET | `/api/me` | Datos del usuario logueado (callsign, nombre, QTH). |
-| GET | `/api/messages` | Lista paginada desde `dirmes.sys`. Query: `type`, `q` (título), `page`, `page_size` (default 50). Orden: número descendente. |
-| GET | `/api/messages/{num}` | Metadata + headers `R:` + cuerpo desde `mail/`. 404 si no existe. |
-| POST | `/api/messages` | Redactar: `{to, route, type: P|B, title, body}` → append a `mail.in`. Respuesta inmediata, importación async (~1 min). |
-| GET | `/api/files` | Archivos de `7pfbb/ok/` agrupados por basename (principal + auxiliares). |
-| GET | `/api/files/{name}` | Sirve un archivo (inline si imagen). **Sanitizar contra path traversal.** |
-| GET | `/*` | Frontend estático embebido. |
+| POST | `/api/login` | `{callsign, password}` → validates against `inf.sys`, sets a cookie. |
+| POST | `/api/logout` | Invalidates the session. |
+| GET | `/api/me` | Logged-in user data (callsign, name, QTH). |
+| GET | `/api/messages` | Paginated list from `dirmes.sys`. Query: `type`, `q` (title), `page`, `page_size` (default 50). Order: descending number. |
+| GET | `/api/messages/{num}` | Metadata + `R:` headers + body from `mail/`. 404 if it does not exist. |
+| POST | `/api/messages` | Compose: `{to, route, type: P|B, title, body}` → append to `mail.in`. Immediate response; asynchronous import (~1 min). |
+| GET | `/api/files` | Files from `7pfbb/ok/` grouped by basename (main + auxiliary). |
+| GET | `/api/files/{name}` | Serves a file (inline for images). **Sanitize against path traversal.** |
+| GET | `/*` | Embedded static frontend. |
 
-## Reglas de seguridad e invariantes (no negociables)
+## Security rules and invariants (non-negotiable)
 
-1. **Jamás escribir ni modificar archivos de FBB** (`inf.sys`, `dirmes.sys`, `mail/*.mes`, `7pfbb/**`). Única excepción: crear/agregar `mail/mail.in`.
-2. Los fixtures de `design/` son **read-only**: no editarlos ni borrarlos; los tests no deben mutarlos.
-3. Todo endpoint que reciba un nombre de archivo debe validarlo (sin `..`, sin separadores de ruta) antes de abrir nada.
-4. Login solo para callsigns con password no vacío; comparación sensible a mayúsculas para el password, insensible para el callsign.
-5. Los mensajes con status inválido/type NUL no se muestran.
+1. **Never write to or modify FBB files** (`inf.sys`, `dirmes.sys`, `mail/*.mes`, `7pfbb/**`). The sole exception is creating/appending to `mail/mail.in`.
+2. Fixtures under `design/` are **read-only**: do not edit or delete them; tests must not mutate them.
+3. Any endpoint receiving a filename must validate it (no `..`, no path separators) before opening anything.
+4. Login is allowed only for callsigns with a non-empty password; password comparison is case-sensitive, callsign comparison is case-insensitive.
+5. Messages with an invalid status or NUL `type` must not be displayed.
 
-## Convenciones
+## Conventions
 
-- Cambios mínimos y focalizados; seguir el estilo del código existente.
-- Todo parser nuevo va con tests: layout 32 contra fixtures reales de `design/`, layout 64 con registros sintéticos construidos según las tablas de arriba.
-- Comentarios y UI en español salvo identificadores de código (inglés).
-- Si se modifica algo documentado aquí (formatos, endpoints, estructura, comandos), **actualizar este AGENTS.md y el README.md en el mismo cambio**.
+- Keep changes minimal and focused; follow the existing style.
+- Every new parser must include tests: 32-bit layout against real fixtures in `design/`, 64-bit layout with synthetic records built from the tables above.
+- Comments and UI are in Spanish unless they are code identifiers (English).
+- If anything documented here changes (formats, endpoints, structure, commands), update this `AGENTS.md` and `README.md` in the same change.

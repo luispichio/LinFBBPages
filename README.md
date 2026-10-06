@@ -1,109 +1,109 @@
 # LinFBBPages
 
-Aplicación web para la gestión de una instancia de [LinFBB](https://sourceforge.net/projects/linfbb/) (BBS de packet radio) que corre en el mismo host, o en un contenedor con el filesystem de FBB compartido.
+Web application for managing a [LinFBB](https://sourceforge.net/projects/linfbb/) instance (packet-radio BBS) running on the same host, or in a container with a shared FBB filesystem.
 
-## Características
+## Features
 
-### Etapa 1 (actual)
+### Stage 1 (current)
 
-- **Login**: validación de callsign + contraseña contra `inf.sys` de FBB (solo usuarios con contraseña definida).
-- **Mensajes**: listado paginado construido desde el índice `dirmes.sys`, lectura de cuerpos desde `mail/`, y redacción/envío de mensajes vía `mail/mail.in` (FBB los importa automáticamente en ~1 minuto).
-- **Archivos 7+**: galería con previsualización de los archivos decodificados en `7pfbb/ok/`.
+- **Login**: validate callsign and password against FBB's `inf.sys` (only users with a configured password).
+- **Messages**: paginated list built from the `dirmes.sys` index, message bodies read from `mail/`, and message composition/sending through `mail/mail.in` (FBB imports them automatically in approximately one minute).
+- **7+ files**: gallery with previews of decoded files in `7pfbb/ok/`.
 
-### Etapa 2 (futuro)
+### Stage 2 (future)
 
-- Información de la aplicación
-    - Referencias al proyecto LinFBB
-    - Versión
-    - Licencia
-    - Repositorio de la aplicación
-- Información del BBS
-- Lista de mensajes
-    - Ordenar por columnas
-    - Scroll infinito
-- Mensajería
-    - Responder, responder por privado, reenviar, etc
-    - Envío de archivos (conversión a 7+)
-- Historial de mensajes leídos + Filtrado por "no leídos"
+- Application information
+    - References to the LinFBB project
+    - Version
+    - License
+    - Application repository
+- BBS information
+- Message list
+    - Sort by columns
+    - Infinite scrolling
+- Messaging
+    - Reply, private reply, forward, etc.
+    - File sending (7+ conversion)
+- Read-message history and filtering by "unread"
 - 7+
-    - Descargar
-    - Abrir haciendo clic en la imágen
+    - Download
+    - Open by clicking the image
     - ...
 - Terminal
-    - Aplicación Web <-> Backend <-> Telnet <-> LinFBB (?)
+    - Web application <-> backend <-> Telnet <-> LinFBB (?)
 - API
 
-### Etapa 3 (futuro)
+### Stage 3 (future)
 
-- Gestión de la instancia FBB
-    - SysOp
-        - Configuración
-        - ADB de usuarios
-        - logs
+- FBB instance management
+    - Sysop
+        - Configuration
+        - User administration
+        - Logs
         - ...
 
-## Arquitectura
+## Architecture
 
-- **Backend**: Go usando únicamente la biblioteca estándar. Produce un binario único y estático, pensado para hardware modesto (1 GHz de CPU / 512 MB de RAM).
-- **Frontend**: HTML/CSS/JS vanilla, sin build step, embebido en el binario con `go:embed`. Interfaz multi-idioma (ES/EN).
-- **Acceso a los datos de FBB**: lectura directa (y de solo lectura) de los archivos de FBB. La única escritura que realiza la aplicación sobre el directorio de FBB es crear/agregar a `mail/mail.in` para el envío de mensajes.
+- **Backend**: Go using only the standard library. Produces a single static binary designed for modest hardware (1 GHz CPU / 512 MB RAM).
+- **Frontend**: vanilla HTML/CSS/JS, with no build step, embedded in the binary with `go:embed`. Multilingual interface (ES/EN).
+- **FBB data access**: direct, read-only access to FBB files. The only write operation performed by the application in the FBB directory is creating/appending to `mail/mail.in` to send messages.
 
-La galería detecta el MIME real de cada archivo. Esto permite previsualizar tanto imágenes `.jpg` como payloads JPEG que algunas instalaciones guardan con extensión `.7mf`; los `.7ix` y `.err` se muestran como archivos auxiliares.
+The gallery detects each file's actual MIME type. This allows it to preview both `.jpg` images and JPEG payloads that some installations store with a `.7mf` extension; `.7ix` and `.err` files are shown as auxiliary files.
 
 ```
 ┌─────────────┐   HTTP/JSON   ┌──────────────────┐   read   ┌─────────────────────┐
 │  Frontend   │ ◄───────────► │  Backend (Go)    │ ───────► │ inf.sys, dirmes.sys │
-│  (estático, │               │  net/http stdlib │          │ mail/*, 7pfbb/ok/*  │
-│   embebido) │               │                  │ ───────► │ mail/mail.in        │
+│  (static,   │               │  net/http stdlib │          │ mail/*, 7pfbb/ok/*  │
+│   embedded) │               │                  │ ───────► │ mail/mail.in        │
 └─────────────┘               └──────────────────┘  append  └─────────────────────┘
 ```
 
-## Requisitos
+## Requirements
 
-- Go 1.22+ (solo para compilar; `CGO_ENABLED=0` genera un binario sin dependencias).
-- Acceso de lectura al directorio de datos de FBB (`/usr/local/var/ax25/fbb` por defecto) y de escritura sobre `mail/` para el envío de mensajes.
+- Go 1.22+ (only needed for compilation; `CGO_ENABLED=0` produces a dependency-free binary).
+- Read access to the FBB data directory (`/usr/local/var/ax25/fbb` by default) and write access to `mail/` for sending messages.
 
-## Compilación y ejecución
+## Build and run
 
 ```sh
 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o linfbbpages ./cmd/linfbbpages
 ./linfbbpages --fbb-dir /usr/local/var/ax25/fbb --listen :8080
 ```
 
-## Configuración
+## Configuration
 
-Todas las opciones pueden pasarse como flag o como variable de entorno.
+All options can be provided as a flag or an environment variable.
 
-| Flag            | Variable de entorno        | Default                     | Descripción |
-|-----------------|----------------------------|-----------------------------|-------------|
-| `--fbb-dir`     | `LINFBBPAGES_FBB_DIR`      | `/usr/local/var/ax25/fbb`   | Directorio de datos de FBB. |
-| `--listen`      | `LINFBBPAGES_LISTEN`       | `:8080`                     | Dirección y puerto de escucha HTTP. |
-| `--fbb-arch`    | `LINFBBPAGES_FBB_ARCH`     | `auto`                      | Formato binario de `inf.sys`/`dirmes.sys`: `auto`, `32` o `64` (ver abajo). |
-| `--session-ttl` | `LINFBBPAGES_SESSION_TTL`  | `8h`                        | Duración de la sesión de login. |
+| Flag            | Environment variable        | Default                     | Description |
+|-----------------|-----------------------------|-----------------------------|-------------|
+| `--fbb-dir`     | `LINFBBPAGES_FBB_DIR`       | `/usr/local/var/ax25/fbb`   | FBB data directory. |
+| `--listen`      | `LINFBBPAGES_LISTEN`         | `:8080`                     | HTTP listen address and port. |
+| `--fbb-arch`    | `LINFBBPAGES_FBB_ARCH`       | `auto`                      | Binary format of `inf.sys`/`dirmes.sys`: `auto`, `32`, or `64` (see below). |
+| `--session-ttl` | `LINFBBPAGES_SESSION_TTL`    | `8h`                        | Login session duration. |
 
-### Formato binario de FBB (`--fbb-arch`)
+### FBB binary format (`--fbb-arch`)
 
-Los archivos binarios de FBB (`inf.sys`, `dirmes.sys`) contienen structs de C con campos `long`, cuyo tamaño depende de cómo fue compilado FBB:
+FBB binary files (`inf.sys`, `dirmes.sys`) contain C structs with `long` fields. The size of those fields depends on how FBB was compiled:
 
-- **32 bits** (`long` = 4 bytes): registros de 360 bytes (`inf.sys`) y 194 bytes (`dirmes.sys`).
-- **64 bits** (`long` = 8 bytes, con alineación a 8): registros de 384 bytes y 224 bytes.
+- **32-bit** (`long` = 4 bytes): 360-byte records (`inf.sys`) and 194-byte records (`dirmes.sys`).
+- **64-bit** (`long` = 8 bytes, aligned to 8): 384-byte records and 224-byte records.
 
-Con `--fbb-arch=auto` (default) la aplicación detecta el formato al iniciar por divisibilidad del tamaño de los archivos. Para diagnosticar una instalación manualmente:
+With `--fbb-arch=auto` (the default), the application detects the format at startup based on file-size divisibility. To diagnose an installation manually:
 
 ```sh
-# inf.sys: size % 360 == 0 → 32 bits ; size % 384 == 0 → 64 bits
-# dirmes.sys: size % 194 == 0 → 32 bits ; size % 224 == 0 → 64 bits
+# inf.sys: size % 360 == 0 → 32-bit ; size % 384 == 0 → 64-bit
+# dirmes.sys: size % 194 == 0 → 32-bit ; size % 224 == 0 → 64-bit
 stat -c '%s %n' /usr/local/var/ax25/fbb/inf.sys /usr/local/var/ax25/fbb/dirmes.sys
 ```
 
-Si ambos formatos son compatibles con el tamaño (archivos muy grandes, múltiplos de ambos registros), `auto` asume 64 bits. Se asume little-endian (válido en x86 y ARM habituales).
+If both formats are compatible with the file sizes (very large files that are multiples of both record sizes), `auto` assumes 64-bit. Little-endian encoding is assumed (valid for common x86 and ARM systems).
 
-## Desarrollo
+## Development
 
-El directorio [`design/`](design/) contiene la documentación original de formatos de FBB (`design/docs/`) y **fixtures reales** de una instalación (`design/usr/local/var/ax25/fbb/`). Para correr en modo desarrollo contra los fixtures:
+The [`design/`](design/) directory contains the original FBB format documentation (`design/docs/`) and **real installation fixtures** (`design/usr/local/var/ax25/fbb/`). To run in development mode against the fixtures:
 
 ```sh
-# Los fixtures están en formato 32 bits:
+# The fixtures use the 32-bit format:
 CGO_ENABLED=0 go run ./cmd/linfbbpages --fbb-dir design/usr/local/var/ax25/fbb --fbb-arch 32
 ```
 
@@ -111,24 +111,24 @@ CGO_ENABLED=0 go run ./cmd/linfbbpages --fbb-dir design/usr/local/var/ax25/fbb -
 go test ./...
 ```
 
-## Notas de seguridad
+## Security notes
 
-- Las contraseñas en `inf.sys` están almacenadas en texto plano por FBB; la aplicación solo las lee para validar el login.
-- Las sesiones son en memoria (se pierden al reiniciar el backend) y se identifican con una cookie httpOnly.
-- Pensada para desplegarse en redes confiables (LAN/VPN). Si se expone a internet, colocarla detrás de un reverse proxy con TLS.
+- Passwords in `inf.sys` are stored as plaintext by FBB; the application only reads them to validate login.
+- Sessions are kept in memory (they are lost when the backend restarts) and identified by an httpOnly cookie.
+- The application is intended for trusted networks (LAN/VPN). If exposed to the internet, place it behind a reverse proxy with TLS.
 
-## Estructura del repositorio
+## Repository structure
 
 ```
-├── cmd/linfbbpages/   # punto de entrada del binario
+├── cmd/linfbbpages/   # binary entry point
 ├── internal/
-│   ├── fbb/           # parsers de inf.sys, dirmes.sys, mail/, 7pfbb/
-│   ├── api/           # handlers HTTP, autenticación y sesiones
-│   └── config/        # configuración (flags + env)
-├── web/static/        # frontend embebido (index.html, app.js, style.css, i18n/)
-└── design/            # documentación de formatos FBB + fixtures para tests/dev
+│   ├── fbb/           # parsers for inf.sys, dirmes.sys, mail/, 7pfbb/
+│   ├── api/           # HTTP handlers, authentication, and sessions
+│   └── config/        # configuration (flags + environment variables)
+├── web/static/        # embedded frontend (index.html, app.js, style.css, i18n/)
+└── design/            # FBB format documentation + fixtures for tests/development
 ```
 
-## Licencia
+## License
 
-A definir.
+To be defined.
