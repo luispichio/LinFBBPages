@@ -20,6 +20,8 @@ Aplicación web para la gestión de una instancia de [LinFBB](https://sourceforg
 - **Frontend**: HTML/CSS/JS vanilla, sin build step, embebido en el binario con `go:embed`. Interfaz multi-idioma (ES/EN).
 - **Acceso a los datos de FBB**: lectura directa (y de solo lectura) de los archivos de FBB. La única escritura que realiza la aplicación sobre el directorio de FBB es crear/agregar a `mail/mail.in` para el envío de mensajes.
 
+La galería detecta el MIME real de cada archivo. Esto permite previsualizar tanto imágenes `.jpg` como payloads JPEG que algunas instalaciones guardan con extensión `.7mf`; los `.7ix` y `.err` se muestran como archivos auxiliares.
+
 ```
 ┌─────────────┐   HTTP/JSON   ┌──────────────────┐   read   ┌─────────────────────┐
 │  Frontend   │ ◄───────────► │  Backend (Go)    │ ───────► │ inf.sys, dirmes.sys │
@@ -30,13 +32,13 @@ Aplicación web para la gestión de una instancia de [LinFBB](https://sourceforg
 
 ## Requisitos
 
-- Go 1.22+ (solo para compilar; el resultado es un binario sin dependencias).
+- Go 1.22+ (solo para compilar; `CGO_ENABLED=0` genera un binario sin dependencias).
 - Acceso de lectura al directorio de datos de FBB (`/usr/local/var/ax25/fbb` por defecto) y de escritura sobre `mail/` para el envío de mensajes.
 
 ## Compilación y ejecución
 
 ```sh
-go build -o linfbbpages ./cmd/linfbbpages
+CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o linfbbpages ./cmd/linfbbpages
 ./linfbbpages --fbb-dir /usr/local/var/ax25/fbb --listen :8080
 ```
 
@@ -74,7 +76,7 @@ El directorio [`design/`](design/) contiene la documentación original de format
 
 ```sh
 # Los fixtures están en formato 32 bits:
-go run ./cmd/linfbbpages --fbb-dir design/usr/local/var/ax25/fbb --fbb-arch 32
+CGO_ENABLED=0 go run ./cmd/linfbbpages --fbb-dir design/usr/local/var/ax25/fbb --fbb-arch 32
 ```
 
 ```sh

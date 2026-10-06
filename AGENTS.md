@@ -29,12 +29,12 @@ El backend **lee directamente los archivos binarios de datos de FBB**. La correc
 ## Comandos
 
 ```sh
-go build -o linfbbpages ./cmd/linfbbpages    # compilar
+CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o linfbbpages ./cmd/linfbbpages # compilar
 go test ./...                                # tests
 go vet ./...                                 # lint básico
 
 # Dev contra fixtures (¡están en formato 32 bits!):
-go run ./cmd/linfbbpages --fbb-dir design/usr/local/var/ax25/fbb --fbb-arch 32
+CGO_ENABLED=0 go run ./cmd/linfbbpages --fbb-dir design/usr/local/var/ax25/fbb --fbb-arch 32
 ```
 
 ## Formatos de archivos de FBB
@@ -141,8 +141,8 @@ SP <destino>[@ruta] < <origen> $<BID-opcional>
 
 ### Archivos decodificados 7+ — `7pfbb/ok/`
 
-- Archivos útiles (ej. `.jpg`) junto a auxiliares por basename: `.7ix` (índice), `.7mf` (multiparte), `.err` (reporte de errores 7PLUS).
-- La vista los agrupa por basename: mostrar el archivo principal con preview si es imagen; los auxiliares como metadata opcional, nunca mezclados en la galería.
+- Archivos útiles (ej. `.jpg`) junto a metadatos por basename: `.7ix` (índice) y `.err` (reporte de errores 7PLUS). En instalaciones reales, `.7mf` puede contener directamente el payload decodificado (por ejemplo, un JPEG), por lo que se detecta por MIME y se muestra como archivo principal.
+- La vista los agrupa por basename: mostrar el archivo principal con preview si es imagen; los metadatos como metadata opcional, nunca mezclados en la galería.
 - `7pfbb/7pl_log` y las partes crudas `*.pNN` en `7pfbb/` **no** se exponen en etapa 1.
 
 ## API HTTP
