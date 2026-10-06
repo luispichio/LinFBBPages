@@ -32,6 +32,9 @@
     document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
       element.placeholder = translate(element.dataset.i18nPlaceholder);
     });
+    document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
+      element.setAttribute("aria-label", translate(element.dataset.i18nAriaLabel));
+    });
     $("#login-language").value = state.language;
     $("#app-language").value = state.language;
     if (state.user) {
@@ -100,6 +103,11 @@
     });
     document.querySelectorAll(".tab").forEach((button) => {
       button.classList.toggle("active", button.dataset.view === view);
+      if (button.dataset.view === view) {
+        button.setAttribute("aria-current", "page");
+      } else {
+        button.removeAttribute("aria-current");
+      }
     });
     hideBanner("#app-error");
     if (view === "messages-view") {

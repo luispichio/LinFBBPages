@@ -9,8 +9,8 @@
 </head>
 <body>
   <main class="shell">
-    <section id="login-view" class="login-card card">
-      <div class="brand-mark">LinFBB Pages</div>
+    <section id="login-view" class="login-card card" aria-labelledby="login-title">
+      <h1 id="login-title" class="brand-mark">LinFBB Pages</h1>
       <p class="muted" data-i18n="login.subtitle">Acceso a la instancia LinFBB</p>
       <form id="login-form" class="stack">
         <label for="login-callsign" data-i18n="login.callsign">Callsign</label>
@@ -22,24 +22,24 @@
       </form>
       <label class="language-picker">
         <span data-i18n="language">Idioma</span>
-        <select id="login-language" aria-label="Idioma">
+        <select id="login-language" data-i18n-aria-label="language" aria-label="Idioma">
           <option value="es">Español</option>
           <option value="en">English</option>
         </select>
       </label>
     </section>
 
-    <section id="app-view" hidden>
+    <section id="app-view" aria-labelledby="app-title" hidden>
       <header class="topbar">
         <div>
-          <div class="eyebrow">LinFBBPages</div>
-          <h1 data-i18n="app.title">Panel de LinFBB</h1>
+          <div class="eyebrow">LinFBB / node</div>
+          <h1 id="app-title" data-i18n="app.title">Panel de LinFBB</h1>
         </div>
         <div class="topbar-actions">
           <span id="current-user" class="user-badge"></span>
           <label class="language-picker compact">
             <span data-i18n="language">Idioma</span>
-            <select id="app-language" aria-label="Idioma">
+            <select id="app-language" data-i18n-aria-label="language" aria-label="Idioma">
               <option value="es">ES</option>
               <option value="en">EN</option>
             </select>
@@ -48,10 +48,10 @@
         </div>
       </header>
 
-      <nav class="tabs" aria-label="Navegación">
-        <button class="tab active" data-view="messages-view" data-i18n="nav.messages">Mensajes</button>
-        <button class="tab" data-view="compose-view" data-i18n="nav.compose">Redactar</button>
-        <button class="tab" data-view="files-view" data-i18n="nav.files">Archivos 7+</button>
+      <nav class="tabs" data-i18n-aria-label="nav.label" aria-label="Navegación">
+        <button class="tab active" type="button" aria-current="page" data-view="messages-view" data-i18n="nav.messages">Mensajes</button>
+        <button class="tab" type="button" data-view="compose-view" data-i18n="nav.compose">Redactar</button>
+        <button class="tab" type="button" data-view="files-view" data-i18n="nav.files">Archivos 7+</button>
       </nav>
 
       <p id="app-error" class="error banner" role="alert" hidden></p>
@@ -84,6 +84,7 @@
         </form>
         <div class="table-wrap">
           <table>
+            <caption class="sr-only" data-i18n="messages.tableCaption">Lista de mensajes de la BBS</caption>
             <thead>
               <tr>
                 <th data-i18n="messages.number">Nº</th>
