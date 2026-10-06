@@ -24,7 +24,10 @@ Web application for managing a [LinFBB](https://sourceforge.net/projects/linfbb/
 - Messaging
     - Reply, private reply, forward, etc.
     - File sending (7+ conversion)
+    - CP437 Font (?)
 - Read-message history and filtering by "unread"
+- Login without password (read-only)
+    - User request form
 - 7+
     - Download
     - Open by clicking the image
