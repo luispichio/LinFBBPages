@@ -6,7 +6,14 @@
     user: null,
     page: 1,
     totalPages: 1,
-    view: "messages-view"
+    view: "messages-view",
+    files: {
+      groups: [],
+      sort: ["date", "name", "type"].includes(localStorage.getItem("linfbb_files_sort")) ? localStorage.getItem("linfbb_files_sort") : "date",
+      mode: ["cards", "list"].includes(localStorage.getItem("linfbb_files_mode")) ? localStorage.getItem("linfbb_files_mode") : "cards",
+      query: ""
+    },
+    lightboxTrigger: null
   };
   let messageLoadToken = 0;
 
@@ -91,6 +98,8 @@
     applyTranslations();
     if (!$("#app-view").hidden && state.view === "messages-view") {
       loadMessages();
+    } else if (!$("#app-view").hidden && state.view === "files-view") {
+      renderFiles();
     }
   }
 
@@ -143,6 +152,9 @@
   function setView(view, options) {
     const historyMode = options && options.historyMode ? options.historyMode : "push";
     const messageNumber = options && options.messageNumber;
+    if (view !== "files-view") {
+      closeFileLightbox();
+    }
     if (view !== "message-detail") {
       messageLoadToken++;
     }
@@ -354,58 +366,277 @@
     if ($("#files-view").hidden) return;
     try {
       const data = await request("/api/files");
-      renderFiles(data.files || []);
+      state.files.groups = data.files || [];
+      renderFiles();
     } catch (error) {
       handleError(error);
     }
   }
 
-  function renderFiles(groups) {
+  function setFileSort(sort) {
+    state.files.sort = ["date", "name", "type"].includes(sort) ? sort : "date";
+    localStorage.setItem("linfbb_files_sort", state.files.sort);
+    renderFiles();
+  }
+
+  function setFileMode(mode) {
+    state.files.mode = mode === "list" ? "list" : "cards";
+    localStorage.setItem("linfbb_files_mode", state.files.mode);
+    renderFiles();
+  }
+
+  function fileGroupFiles(group) {
+    return [group.primary].concat(group.auxiliary || []).filter(Boolean);
+  }
+
+  function fileGroupName(group) {
+    return group.primary ? group.primary.name : group.name;
+  }
+
+  function fileGroupRepresentative(group) {
+    if (group.primary) return group.primary;
+    return fileGroupFiles(group).reduce((latest, file) => {
+      if (!latest) return file;
+      return (Date.parse(file.modified) || 0) > (Date.parse(latest.modified) || 0) ? file : latest;
+    }, null);
+  }
+
+  function fileGroupDate(group) {
+    const representative = fileGroupRepresentative(group);
+    return representative ? representative.modified : "";
+  }
+
+  function fileGroupType(group) {
+    const representative = group.primary || fileGroupRepresentative(group);
+    if (representative && representative.mime) return representative.mime.toLowerCase();
+    const name = representative ? representative.name : group.name;
+    const extension = name.lastIndexOf(".");
+    return extension >= 0 ? name.slice(extension + 1).toLowerCase() : "";
+  }
+
+  function fileType(file) {
+    if (!file) return "—";
+    if (file.mime) return file.mime;
+    const extension = file.name ? file.name.lastIndexOf(".") : -1;
+    return extension >= 0 ? file.name.slice(extension + 1).toLowerCase() : "—";
+  }
+
+  function fileSize(file) {
+    return file && Number.isFinite(Number(file.size)) ? formatBytes(Number(file.size)) : "—";
+  }
+
+  function fileGroupSearchText(group) {
+    return [group.name].concat(fileGroupFiles(group).reduce((values, file) => values.concat(file.name, file.mime), [])).join(" ").toLowerCase();
+  }
+
+  function sortedFileGroups(groups) {
+    const collator = new Intl.Collator(state.language, { numeric: true, sensitivity: "base" });
+    return groups.slice().sort((left, right) => {
+      if (state.files.sort === "date") {
+        const dateDifference = (Date.parse(fileGroupDate(right)) || 0) - (Date.parse(fileGroupDate(left)) || 0);
+        if (dateDifference !== 0) return dateDifference;
+      } else if (state.files.sort === "type") {
+        const typeDifference = collator.compare(fileGroupType(left), fileGroupType(right));
+        if (typeDifference !== 0) return typeDifference;
+      }
+      return collator.compare(fileGroupName(left), fileGroupName(right));
+    });
+  }
+
+  function formatFileDate(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return new Intl.DateTimeFormat(state.language, {
+      dateStyle: "short",
+      timeStyle: "short",
+      timeZone: "UTC"
+    }).format(date);
+  }
+
+  function syncFileControls() {
+    const sort = $("#files-sort");
+    const search = $("#files-search");
     const grid = $("#files-grid");
+    if (sort) sort.value = state.files.sort;
+    if (search && search.value !== state.files.query) search.value = state.files.query;
+    if (grid) grid.dataset.mode = state.files.mode;
+    document.querySelectorAll("#files-view-mode button").forEach((button) => {
+      const active = button.dataset.mode === state.files.mode;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+  }
+
+  function renderFiles() {
+    const grid = $("#files-grid");
+    const query = state.files.query.trim().toLowerCase();
+    const groups = sortedFileGroups(state.files.groups.filter((group) => !query || fileGroupSearchText(group).includes(query)));
     grid.replaceChildren();
-    $("#files-empty").hidden = groups.length !== 0;
+    syncFileControls();
+    const empty = $("#files-empty");
+    empty.hidden = groups.length !== 0;
+    empty.textContent = query ? translate("files.noResults") : translate("files.empty");
+    if (state.files.mode === "list" && groups.length) {
+      renderFileDirectory(groups);
+      return;
+    }
     groups.forEach((group) => {
       const card = document.createElement("article");
       card.className = "file-card";
       if (group.primary && group.primary.mime && group.primary.mime.startsWith("image/")) {
+        const preview = document.createElement("button");
+        preview.className = "file-preview";
+        preview.type = "button";
+        preview.setAttribute("aria-label", format("files.previewLabel", { name: group.primary.name }));
         const image = document.createElement("img");
         image.loading = "lazy";
         image.alt = group.primary.name;
         image.src = `/api/files/${encodeURIComponent(group.primary.name)}`;
-        card.appendChild(image);
+        preview.appendChild(image);
+        preview.addEventListener("click", () => openFileLightbox(group.primary, preview));
+        card.appendChild(preview);
       } else {
         const icon = document.createElement("div");
         icon.className = "file-icon";
-        icon.textContent = "7+";
+        icon.textContent = group.primary ? "7+" : "META";
         card.appendChild(icon);
       }
       const content = document.createElement("div");
       content.className = "file-card-content";
       const title = document.createElement("h3");
-      title.textContent = group.primary ? group.primary.name : group.name;
+      title.textContent = fileGroupName(group);
       content.appendChild(title);
-      if (group.primary) {
+      const representative = fileGroupRepresentative(group);
+      if (representative) {
         const details = document.createElement("p");
-        details.className = "muted small";
-        details.textContent = `${formatBytes(group.primary.size)} · ${group.primary.mime}`;
+        details.className = "muted small file-details";
+        details.textContent = `${format("files.modified", { date: formatFileDate(representative.modified) })} · ${fileSize(representative)} · ${fileType(representative)}`;
         content.appendChild(details);
-        const link = document.createElement("a");
-        link.className = "table-link";
-        link.href = `/api/files/${encodeURIComponent(group.primary.name)}`;
-        link.target = "_blank";
-        link.rel = "noopener";
-        link.textContent = translate("files.download");
-        content.appendChild(link);
+      }
+      if (group.primary) {
+        const actions = document.createElement("div");
+        actions.className = "file-actions";
+        const download = document.createElement("a");
+        download.className = "secondary file-download";
+        download.href = `/api/files/${encodeURIComponent(group.primary.name)}`;
+        download.download = group.primary.name;
+        download.textContent = translate("files.download");
+        actions.appendChild(download);
+        content.appendChild(actions);
       }
       if (group.auxiliary && group.auxiliary.length) {
         const aux = document.createElement("p");
-        aux.className = "muted small";
+        aux.className = "muted small file-auxiliary";
         aux.textContent = `${translate("files.auxiliary")}: ${group.auxiliary.map((file) => file.name).join(", ")}`;
         content.appendChild(aux);
       }
       card.appendChild(content);
       grid.appendChild(card);
     });
+  }
+
+  function renderFileDirectory(groups) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "table-wrap files-directory";
+    const table = document.createElement("table");
+    const caption = document.createElement("caption");
+    caption.className = "sr-only";
+    caption.textContent = translate("files.tableCaption");
+    table.appendChild(caption);
+
+    const head = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    ["files.name", "files.type", "files.size", "files.date", "files.actions"].forEach((key) => {
+      const cell = document.createElement("th");
+      cell.scope = "col";
+      cell.textContent = translate(key);
+      headerRow.appendChild(cell);
+    });
+    head.appendChild(headerRow);
+    table.appendChild(head);
+
+    const body = document.createElement("tbody");
+    groups.forEach((group) => {
+      const row = document.createElement("tr");
+      const representative = fileGroupRepresentative(group);
+
+      const nameCell = document.createElement("td");
+      nameCell.className = "file-directory-name";
+      const nameLine = document.createElement("div");
+      nameLine.className = "file-name-line";
+      const marker = document.createElement("span");
+      marker.className = "file-kind";
+      marker.textContent = group.primary ? "7+" : "META";
+      const name = document.createElement("span");
+      name.className = "file-name";
+      name.textContent = fileGroupName(group);
+      nameLine.append(marker, name);
+      nameCell.appendChild(nameLine);
+      if (group.auxiliary && group.auxiliary.length) {
+        const auxiliary = document.createElement("div");
+        auxiliary.className = "muted small file-auxiliary";
+        auxiliary.textContent = `${translate("files.auxiliary")}: ${group.auxiliary.map((file) => file.name).join(", ")}`;
+        nameCell.appendChild(auxiliary);
+      }
+      row.appendChild(nameCell);
+
+      const type = document.createElement("td");
+      type.textContent = fileType(representative);
+      row.appendChild(type);
+
+      const size = document.createElement("td");
+      size.textContent = fileSize(representative);
+      row.appendChild(size);
+
+      const date = document.createElement("td");
+      date.textContent = representative ? formatFileDate(representative.modified) : "—";
+      row.appendChild(date);
+
+      const actions = document.createElement("td");
+      if (group.primary) {
+        const download = document.createElement("a");
+        download.className = "secondary file-download";
+        download.href = `/api/files/${encodeURIComponent(group.primary.name)}`;
+        download.download = group.primary.name;
+        download.textContent = translate("files.download");
+        actions.appendChild(download);
+      } else {
+        actions.textContent = "—";
+      }
+      row.appendChild(actions);
+      body.appendChild(row);
+    });
+    table.appendChild(body);
+    wrapper.appendChild(table);
+    $("#files-grid").appendChild(wrapper);
+  }
+
+  function openFileLightbox(file, trigger) {
+    const lightbox = $("#file-lightbox");
+    const image = $("#file-lightbox-image");
+    const download = $("#file-lightbox-download");
+    state.lightboxTrigger = trigger;
+    $("#file-lightbox-title").textContent = file.name;
+    image.src = `/api/files/${encodeURIComponent(file.name)}`;
+    image.alt = file.name;
+    download.href = `/api/files/${encodeURIComponent(file.name)}`;
+    download.download = file.name;
+    lightbox.hidden = false;
+    document.body.classList.add("modal-open");
+    $("#file-lightbox-close").focus();
+  }
+
+  function closeFileLightbox() {
+    const lightbox = $("#file-lightbox");
+    if (!lightbox || lightbox.hidden) return;
+    lightbox.hidden = true;
+    $("#file-lightbox-image").removeAttribute("src");
+    $("#file-lightbox-download").removeAttribute("href");
+    $("#file-lightbox-download").removeAttribute("download");
+    document.body.classList.remove("modal-open");
+    const trigger = state.lightboxTrigger;
+    state.lightboxTrigger = null;
+    if (trigger && document.contains(trigger)) trigger.focus();
   }
 
   function formatBytes(size) {
@@ -441,6 +672,19 @@
     $("#close-detail").addEventListener("click", () => setView("messages-view"));
     $("#compose-form").addEventListener("submit", submitCompose);
     $("#refresh-files").addEventListener("click", loadFiles);
+    $("#files-search").addEventListener("input", (event) => {
+      state.files.query = event.target.value;
+      renderFiles();
+    });
+    $("#files-sort").addEventListener("change", (event) => setFileSort(event.target.value));
+    document.querySelectorAll("#files-view-mode button").forEach((button) => {
+      button.addEventListener("click", () => setFileMode(button.dataset.mode));
+    });
+    $("#file-lightbox-close").addEventListener("click", closeFileLightbox);
+    $("#file-lightbox-backdrop").addEventListener("click", closeFileLightbox);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeFileLightbox();
+    });
     loadSession();
   }
 

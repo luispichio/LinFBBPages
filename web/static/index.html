@@ -168,11 +168,45 @@
           </div>
           <button id="refresh-files" class="secondary" type="button" data-i18n="common.refresh">Actualizar</button>
         </div>
+        <div class="files-toolbar">
+          <label class="files-search">
+            <span data-i18n="files.search">Buscar archivos</span>
+            <input id="files-search" type="search" data-i18n-placeholder="files.searchPlaceholder" placeholder="Nombre, MIME o extensión">
+          </label>
+          <div class="files-controls">
+            <label>
+              <span data-i18n="files.sort">Ordenar</span>
+              <select id="files-sort">
+                <option value="date" data-i18n="files.sortDate">Fecha (recientes)</option>
+                <option value="name" data-i18n="files.sortName">Nombre</option>
+                <option value="type" data-i18n="files.sortType">Tipo</option>
+              </select>
+            </label>
+            <div id="files-view-mode" class="view-toggle" role="group" data-i18n-aria-label="files.viewMode" aria-label="Modo de vista">
+              <button id="files-cards" class="active" type="button" data-mode="cards" aria-pressed="true" data-i18n="files.cards">Tarjetas</button>
+              <button id="files-list" type="button" data-mode="list" aria-pressed="false" data-i18n="files.list">Lista</button>
+            </div>
+          </div>
+        </div>
         <div id="files-grid" class="gallery"></div>
         <div id="files-empty" class="empty" hidden data-i18n="files.empty">No hay archivos decodificados.</div>
       </section>
     </section>
   </main>
+
+  <div id="file-lightbox" class="lightbox" role="dialog" aria-modal="true" aria-labelledby="file-lightbox-title" hidden>
+    <div id="file-lightbox-backdrop" class="lightbox-backdrop"></div>
+    <div class="lightbox-panel">
+      <div class="lightbox-header">
+        <h2 id="file-lightbox-title"></h2>
+        <button id="file-lightbox-close" class="lightbox-close" type="button" data-i18n-aria-label="files.close" aria-label="Cerrar vista previa">×</button>
+      </div>
+      <img id="file-lightbox-image" class="lightbox-image" alt="">
+      <div class="lightbox-footer">
+        <a id="file-lightbox-download" class="primary" data-i18n="files.download">Descargar</a>
+      </div>
+    </div>
+  </div>
 
   <script src="i18n/es.js"></script>
   <script src="i18n/en.js"></script>

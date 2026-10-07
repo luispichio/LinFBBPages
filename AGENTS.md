@@ -145,7 +145,7 @@ SP <destination>[@route] < <source> $<optional-BID>
 ### Decoded 7+ files — `7pfbb/ok/`
 
 - Useful files (e.g. `.jpg`) are stored with basename metadata: `.7ix` (index) and `.err` (7PLUS error report). In real installations, `.7mf` may contain the decoded payload directly (for example, a JPEG), so MIME detection identifies it and displays it as the main file.
-- The view groups files by basename: show the main file with a preview when it is an image; show metadata as optional auxiliary data, never mixed into the gallery.
+- The view groups files by basename: show the main file with a preview when it is an image; show metadata as optional auxiliary data, never mixed into the gallery. The frontend supports search, name/date/type sorting, image cards with lightbox previews, downloads, modified date/time display, and a directory-style list without image previews.
 - `7pfbb/7pl_log` and raw `*.pNN` parts in `7pfbb/` are **not exposed** in stage 1.
 
 ## HTTP API
