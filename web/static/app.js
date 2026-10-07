@@ -524,12 +524,6 @@
         actions.appendChild(download);
         content.appendChild(actions);
       }
-      if (group.auxiliary && group.auxiliary.length) {
-        const aux = document.createElement("p");
-        aux.className = "muted small file-auxiliary";
-        aux.textContent = `${translate("files.auxiliary")}: ${group.auxiliary.map((file) => file.name).join(", ")}`;
-        content.appendChild(aux);
-      }
       card.appendChild(content);
       grid.appendChild(card);
     });
