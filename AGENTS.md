@@ -48,6 +48,7 @@ Original documentation is in `design/docs/` (`fmtinf.html`, `fmtdirme.html`, `fm
 - C `long` = 4 bytes in 32-bit builds, 8 bytes in 64-bit builds (with 8-byte alignment and padding). The layout is selected with `--fbb-arch` (`auto`|`32`|`64`, default `auto`), and parsers must be **table-driven** from a `Layout` type: hardcoding offsets outside the layout definition is forbidden.
 - Files can change while FBB is running: cache parsed data by **mtime** and reread when it changes. Never keep file handles open.
 - Historical note: the documentation declares `flags`/`on_base` as `unsigned`, but the fixture confirms they occupy **2 bytes** (2880 = 8×360 and `pass` is found at offset 338).
+- LinFBB's `F_SYS` user flag is `0x0008` (the `S`/Sysop flag from `include/fbb_serv.h`). The parser exposes it as `User.Sysop`; it is captured in the in-memory session at login time.
 
 ### `inf.sys` — users (login)
 
@@ -111,6 +112,8 @@ Fixed-size records. **Record 0 is a header**: only its `numero` field is valid (
 
 Types: `B` bulletin, `P` private, `A`/`T` less common. Statuses: `N` new, `Y` read, `F` forwarded, `K` killed, `A` archived, `$` being processed. Full semantics are documented in `design/docs/fmtdirme.html`.
 
+Visibility rules: Sysops see all valid types and statuses. Non-Sysop users see `B` bulletins except `K`/`$` records, and `P`/`A`/`T` private messages only when their callsign matches the sender or recipient (case-insensitive and ignoring SSID); other types and `K`/`$` records are hidden.
+
 ### Architecture detection (`--fbb-arch=auto`)
 
 At startup, for `inf.sys` and `dirmes.sys`:
@@ -153,9 +156,9 @@ JSON; a session cookie is required for every endpoint except `/api/login`. The a
 |---|---|---|
 | POST | `/api/login` | `{callsign, password}` → validates against `inf.sys`, sets a cookie. |
 | POST | `/api/logout` | Invalidates the session. |
-| GET | `/api/me` | Logged-in user data (callsign, name, QTH). |
-| GET | `/api/messages` | Paginated list from `dirmes.sys`. Query: `type`, `q` (title), `page`, `page_size` (default 50). Order: descending number. |
-| GET | `/api/messages/{num}` | Metadata + `R:` headers + body from `mail/`. 404 if it does not exist. |
+| GET | `/api/me` | Logged-in user data (callsign, name, QTH, `sysop`). |
+| GET | `/api/messages` | Paginated visibility-filtered list from `dirmes.sys`. Query: `type`, `q` (title), `page`, `page_size` (default 50). Order: descending number. |
+| GET | `/api/messages/{num}` | Metadata + `R:` headers + body from `mail/` when visible to the user. Returns 404 if it does not exist or is not visible. |
 | POST | `/api/messages` | Compose: `{to, route, type: P|B, title, body}` → append to `mail.in`. Immediate response; asynchronous import (~1 min). |
 | GET | `/api/files` | Files from `7pfbb/ok/` grouped by basename (main + auxiliary). |
 | GET | `/api/files/{name}` | Serves a file (inline for images). **Sanitize against path traversal.** |
@@ -168,6 +171,7 @@ JSON; a session cookie is required for every endpoint except `/api/login`. The a
 3. Any endpoint receiving a filename must validate it (no `..`, no path separators) before opening anything.
 4. Login is allowed only for callsigns with a non-empty password; password comparison is case-sensitive, callsign comparison is case-insensitive.
 5. Messages with an invalid status or NUL `type` must not be displayed.
+6. Non-Sysop users must not receive private messages (`P`/`A`/`T`) belonging to other users, or `K`/`$` records. The API returns 404 for inaccessible message details; Sysops can see all valid records.
 
 ## Conventions
 

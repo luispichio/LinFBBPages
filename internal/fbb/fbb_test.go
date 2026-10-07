@@ -61,6 +61,18 @@ func TestParseFixtureUsersAndAuthentication(t *testing.T) {
 	if len(users) != 8 {
 		t.Fatalf("got %d users, want 8", len(users))
 	}
+	if users[0].Sysop {
+		t.Fatalf("unexpected sysop flag for %s", users[0].Callsign)
+	}
+	var foundSysop bool
+	for _, user := range users {
+		if user.Callsign == "LW6DIO" {
+			foundSysop = user.Sysop
+		}
+	}
+	if !foundSysop {
+		t.Fatal("LW6DIO sysop flag was not parsed")
+	}
 	if users[0].Callsign != "LU4ECL" || users[0].FirstName != "Ernesto" || users[0].password != "ECL1234" {
 		t.Fatalf("unexpected first user: %+v", users[0])
 	}
@@ -116,12 +128,23 @@ func TestParse64BitSyntheticRecords(t *testing.T) {
 	userRecord[layout.Info.SSID] = 2
 	copy(userRecord[layout.Info.Password:], "secret")
 	copy(userRecord[layout.Info.FirstName:], "Tester")
+	userRecord[layout.Info.Flags] = byte(userFlagSysop)
+	userRecord[layout.Info.Flags+1] = byte(userFlagSysop >> 8)
 	users, err := parseUsers(userRecord, layout)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(users) != 1 || users[0].Callsign != "LW1EAA" || users[0].SSID != 2 || users[0].password != "secret" {
+	if len(users) != 1 || users[0].Callsign != "LW1EAA" || users[0].SSID != 2 || users[0].password != "secret" || !users[0].Sysop {
 		t.Fatalf("unexpected 64-bit user: %+v", users)
+	}
+	userRecord[layout.Info.Flags] = 0
+	userRecord[layout.Info.Flags+1] = 0
+	users, err = parseUsers(userRecord, layout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(users) != 1 || users[0].Sysop {
+		t.Fatalf("unexpected non-sysop 64-bit user: %+v", users)
 	}
 
 	dirmes := make([]byte, layout.DirmesRecordSize*2)

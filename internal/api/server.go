@@ -179,6 +179,37 @@ func currentUser(r *http.Request) (fbb.User, bool) {
 	return user, ok
 }
 
+func messageVisibleTo(message fbb.Message, user fbb.User) bool {
+	if user.Sysop {
+		return true
+	}
+	if message.Status == "$" || message.Status == "K" {
+		return false
+	}
+	switch strings.ToUpper(strings.TrimSpace(message.Type)) {
+	case "B":
+		return true
+	case "P", "A", "T":
+		return sameCallsign(message.From, user.Callsign) || sameCallsign(message.To, user.Callsign)
+	default:
+		return false
+	}
+}
+
+func sameCallsign(left, right string) bool {
+	left = callsignWithoutSSID(left)
+	right = callsignWithoutSSID(right)
+	return left != "" && strings.EqualFold(left, right)
+}
+
+func callsignWithoutSSID(callsign string) string {
+	callsign = strings.TrimSpace(callsign)
+	if index := strings.IndexByte(callsign, '-'); index >= 0 {
+		callsign = callsign[:index]
+	}
+	return callsign
+}
+
 func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -191,6 +222,11 @@ func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
+	user, ok := currentUser(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "sesión requerida")
+		return
+	}
 	all, err := s.store.Messages()
 	if err != nil {
 		s.logger.Printf("messages: %v", err)
@@ -202,6 +238,9 @@ func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 	textFilter := strings.ToLower(strings.TrimSpace(query.Get("q")))
 	filtered := make([]fbb.Message, 0, len(all))
 	for _, message := range all {
+		if !messageVisibleTo(message, user) {
+			continue
+		}
 		if typeFilter != "" && message.Type != typeFilter {
 			continue
 		}
@@ -267,6 +306,30 @@ func (s *Server) message(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "número de mensaje inválido")
 		return
 	}
+	user, ok := currentUser(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "sesión requerida")
+		return
+	}
+	indexedMessages, err := s.store.Messages()
+	if err != nil {
+		s.logger.Printf("message index: %v", err)
+		writeError(w, http.StatusInternalServerError, "no se pudo leer el índice de mensajes")
+		return
+	}
+	var indexedMessage fbb.Message
+	found := false
+	for _, candidate := range indexedMessages {
+		if candidate.Number == number {
+			indexedMessage = candidate
+			found = true
+			break
+		}
+	}
+	if !found || !messageVisibleTo(indexedMessage, user) {
+		writeError(w, http.StatusNotFound, "mensaje no encontrado")
+		return
+	}
 	message, body, err := s.store.Message(number)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -275,6 +338,10 @@ func (s *Server) message(w http.ResponseWriter, r *http.Request) {
 		}
 		s.logger.Printf("message %d: %v", number, err)
 		writeError(w, http.StatusInternalServerError, "no se pudo leer el mensaje")
+		return
+	}
+	if !messageVisibleTo(message, user) {
+		writeError(w, http.StatusNotFound, "mensaje no encontrado")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"message": message, "body": body})

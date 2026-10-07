@@ -2,12 +2,16 @@ package fbb
 
 import (
 	"crypto/subtle"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 )
+
+// userFlagSysop is F_SYS, the S (Sysop) flag defined by LinFBB.
+const userFlagSysop uint16 = 0x0008 // F_SYS: the S (Sysop) flag in LinFBB.
 
 // User is the subset of an FBB user record needed by the web application.
 // Password is intentionally not exported as JSON by the API; it is retained
@@ -22,6 +26,7 @@ type User struct {
 	Home      string `json:"home_bbs,omitempty"`
 	QTH       string `json:"qth,omitempty"`
 	ZIP       string `json:"zip,omitempty"`
+	Sysop     bool   `json:"sysop"`
 
 	password string
 }
@@ -45,6 +50,7 @@ func parseUsers(data []byte, layout Layout) ([]User, error) {
 		if callsign == "" {
 			continue
 		}
+		flags := binary.LittleEndian.Uint16(record[layout.Info.Flags : layout.Info.Flags+2])
 		users = append(users, User{
 			Callsign:  callsign,
 			SSID:      record[layout.Info.SSID],
@@ -55,6 +61,7 @@ func parseUsers(data []byte, layout Layout) ([]User, error) {
 			Home:      cString(record, layout.Info.Home, 41),
 			QTH:       cString(record, layout.Info.QTH, 7),
 			ZIP:       cString(record, layout.Info.ZIP, 9),
+			Sysop:     flags&userFlagSysop != 0,
 			password:  cStringRaw(record, layout.Info.Password, 13),
 		})
 	}
