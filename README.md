@@ -29,14 +29,17 @@ Web application for managing a [LinFBB](https://sourceforge.net/projects/linfbb/
 - Login without password (read-only)
     - User request form
 - 7+
+    - File info
     - Download
-    - Open by clicking the image
-    - ...
+    - Image viewer
+    - Sorting / filtering
+        - Received
+        - Type / extension        
 - Terminal
     - Web application <-> backend <-> Telnet <-> LinFBB (?)
 - API
 
-### Stage 3 (future)
+### Stage 3 (another future)
 
 - FBB instance management
     - Sysop

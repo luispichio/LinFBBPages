@@ -8,6 +8,7 @@
     totalPages: 1,
     view: "messages-view"
   };
+  let messageLoadToken = 0;
 
   const $ = (selector) => document.querySelector(selector);
 
@@ -22,6 +23,48 @@
 
   function format(key, values) {
     return translate(key).replace(/\{(\w+)\}/g, (_, name) => values[name] == null ? "" : values[name]);
+  }
+
+  function routeFromHash() {
+    const hash = window.location.hash.slice(1);
+    if (hash === "compose") return { view: "compose-view" };
+    if (hash === "files") return { view: "files-view" };
+    const messageMatch = /^msg-(\d+)$/.exec(hash);
+    if (messageMatch) return { view: "message-detail", number: messageMatch[1] };
+    return { view: "messages-view" };
+  }
+
+  function hashForView(view, messageNumber) {
+    if (view === "compose-view") return "#compose";
+    if (view === "files-view") return "#files";
+    if (view === "message-detail" && /^\d+$/.test(String(messageNumber))) {
+      return `#msg-${messageNumber}`;
+    }
+    return "#messages";
+  }
+
+  function updateHistory(view, messageNumber, historyMode) {
+    if (historyMode === "none") return;
+    const hash = hashForView(view, messageNumber);
+    const routeState = { view, messageNumber: messageNumber == null ? null : String(messageNumber) };
+    if (window.location.hash === hash || historyMode === "replace") {
+      window.history.replaceState(routeState, "", hash);
+      return;
+    }
+    window.history.pushState(routeState, "", hash);
+  }
+
+  function clearRouteHistory() {
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+  }
+
+  function restoreRoute() {
+    const route = routeFromHash();
+    if (route.view === "message-detail") {
+      loadMessage(route.number, { historyMode: "none" });
+      return;
+    }
+    setView(route.view, { historyMode: "replace" });
   }
 
   function applyTranslations() {
@@ -72,6 +115,8 @@
   }
 
   function showLogin() {
+    messageLoadToken++;
+    clearRouteHistory();
     $("#login-view").hidden = false;
     $("#app-view").hidden = true;
     state.user = null;
@@ -82,8 +127,7 @@
     $("#login-view").hidden = true;
     $("#app-view").hidden = false;
     renderUser();
-    setView("messages-view");
-    loadMessages();
+    restoreRoute();
   }
 
   function renderUser() {
@@ -96,8 +140,14 @@
     $("#current-user").textContent = fullName ? `${user.callsign} · ${fullName}` : user.callsign;
   }
 
-  function setView(view) {
+  function setView(view, options) {
+    const historyMode = options && options.historyMode ? options.historyMode : "push";
+    const messageNumber = options && options.messageNumber;
+    if (view !== "message-detail") {
+      messageLoadToken++;
+    }
     state.view = view;
+    updateHistory(view, messageNumber, historyMode);
     document.querySelectorAll(".view").forEach((element) => {
       element.hidden = element.id !== view;
     });
@@ -185,6 +235,7 @@
   }
 
   async function loadMessages() {
+    messageLoadToken++;
     if ($("#messages-view").hidden) return;
     const form = new FormData($("#message-filters"));
     const params = new URLSearchParams({ page: String(state.page), page_size: "50" });
@@ -228,13 +279,20 @@
     });
   }
 
-  async function loadMessage(number) {
+  async function loadMessage(number, options) {
+    const historyMode = options && options.historyMode ? options.historyMode : "push";
+    const requestToken = ++messageLoadToken;
     try {
       const data = await request(`/api/messages/${encodeURIComponent(number)}`);
+      if (requestToken !== messageLoadToken) return;
       renderMessageDetail(data.message, data.body);
-      setView("message-detail");
+      setView("message-detail", { historyMode, messageNumber: number });
     } catch (error) {
+      if (requestToken !== messageLoadToken) return;
       handleError(error);
+      if (state.user && routeFromHash().view === "message-detail") {
+        setView("messages-view", { historyMode: "replace" });
+      }
     }
   }
 
@@ -356,6 +414,14 @@
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   }
 
+  function handleHistoryNavigation() {
+    if (!state.user) {
+      clearRouteHistory();
+      return;
+    }
+    restoreRoute();
+  }
+
   function init() {
     applyTranslations();
     $("#login-form").addEventListener("submit", login);
@@ -363,6 +429,7 @@
     $("#login-language").addEventListener("change", (event) => setLanguage(event.target.value));
     $("#app-language").addEventListener("change", (event) => setLanguage(event.target.value));
     document.querySelectorAll(".tab").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
+    window.addEventListener("popstate", handleHistoryNavigation);
     $("#message-filters").addEventListener("submit", (event) => {
       event.preventDefault();
       state.page = 1;
