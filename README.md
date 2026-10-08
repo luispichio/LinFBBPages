@@ -7,7 +7,7 @@ Web application for managing a [LinFBB](https://sourceforge.net/projects/linfbb/
 ### Stage 1 (current)
 
 - **Login**: validate callsign and password against FBB's `inf.sys` (only users with a configured password).
-- **Messages**: paginated list built from the `dirmes.sys` index, message bodies read from `mail/`, and message composition/sending through `mail/mail.in` (FBB imports them automatically in approximately one minute).
+- **Messages**: paginated list built from the `dirmes.sys` index with sender, recipient, route, and size; compact two-line entries on mobile; message bodies read from `mail/`; and composition/sending through `mail/mail.in` (FBB imports them automatically in approximately one minute).
 - **Message visibility**: non-Sysop users see bulletins and private messages sent or received by them; Sysops can see all valid message types and statuses.
 - **7+ files**: gallery with previews of decoded files in `7pfbb/ok/`, file information, download links, image viewer, search, sorting, cards, and a directory-style list without image previews.
 

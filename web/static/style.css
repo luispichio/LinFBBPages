@@ -221,7 +221,52 @@ th { background: var(--bg); color: var(--muted); font-size: .76rem; font-weight:
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr { transition: background-color .16s ease; }
 tbody tr:hover { background: var(--primary-soft); }
-tbody td:first-child, tbody td:nth-child(2), tbody td:nth-child(3) { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .8rem; }
+.messages-table { min-width: 980px; table-layout: fixed; }
+.messages-table .col-number { width: 64px; }
+.messages-table .col-type { width: 58px; }
+.messages-table .col-status { width: 70px; }
+.messages-table .col-size { width: 84px; }
+.messages-table .col-from, .messages-table .col-to { width: 92px; }
+.messages-table .col-route { width: 120px; }
+.messages-table .col-date { width: 160px; }
+.messages-table td.col-number, .messages-table td.col-type, .messages-table td.col-status,
+.messages-table td.col-size, .messages-table td.col-route {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .8rem;
+}
+.messages-table td.col-from, .messages-table td.col-to, .messages-table td.col-route { overflow: hidden; text-overflow: ellipsis; }
+.messages-table td.col-subject { overflow: hidden; }
+.messages-table .table-link { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.message-mobile-cell { display: none; }
+.message-mobile-entry { display: grid; min-width: 0; gap: 6px; }
+.message-mobile-meta {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: .25rem;
+  color: var(--muted);
+  font: 650 .72rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: nowrap;
+}
+.message-mobile-number, .message-mobile-type-status, .message-mobile-size, .message-mobile-date { flex: 0 0 auto; }
+.message-mobile-number { color: var(--text); font-weight: 800; }
+.message-mobile-type-status { color: var(--primary); }
+.message-mobile-size { color: var(--muted); }
+.message-mobile-address {
+  flex: 0 1 8em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.message-mobile-route {
+  flex: 1 .5 5em;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--primary);
+  text-overflow: ellipsis;
+}
+.message-mobile-date { margin-left: auto; color: var(--muted); font-size: .68rem; }
+.message-mobile-subject .table-link { display: block; white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }
 .empty { margin-top: 14px; padding: 35px 10px; border: 1px dashed var(--line-strong); border-radius: 9px; color: var(--muted); text-align: center; }
 .pagination { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 20px; color: var(--muted); font-size: .88rem; }
 .pagination button { min-width: 92px; }
@@ -291,6 +336,14 @@ tbody td:first-child, tbody td:nth-child(2), tbody td:nth-child(3) { font-family
   .form-grid .wide { grid-column: auto; }
   .section-heading { align-items: stretch; flex-direction: column; gap: 12px; }
   .section-heading > button { align-self: flex-start; }
+  .messages-table { min-width: 0; table-layout: auto; }
+  .messages-table th, .messages-table td { width: auto; }
+  .messages-table thead { display: none; }
+  .messages-table tbody { display: block; }
+  .messages-table tbody tr { display: block; padding: 10px 11px; border-bottom: 1px solid var(--line); }
+  .messages-table tbody tr:last-child { border-bottom: 0; }
+  .messages-table td.message-desktop-cell { display: none; }
+  .messages-table td.message-mobile-cell { display: block; padding: 0; border: 0; white-space: normal; }
 }
 
 @media (max-width: 440px) {

@@ -81,17 +81,19 @@
           <button class="secondary filter-submit" type="submit" data-i18n="common.apply">Aplicar</button>
         </form>
         <div class="table-wrap">
-          <table>
+          <table class="messages-table">
             <caption class="sr-only" data-i18n="messages.tableCaption">Lista de mensajes de la BBS</caption>
             <thead>
               <tr>
-                <th data-i18n="messages.number">Nº</th>
-                <th data-i18n="messages.type">Tipo</th>
-                <th data-i18n="messages.status">Estado</th>
-                <th data-i18n="messages.from">De</th>
-                <th data-i18n="messages.to">Para</th>
-                <th data-i18n="messages.subject">Asunto</th>
-                <th data-i18n="messages.date">Fecha</th>
+                <th class="col-number" data-i18n="messages.number">Nº</th>
+                <th class="col-type" data-i18n="messages.type">Tipo</th>
+                <th class="col-status" data-i18n="messages.status">Estado</th>
+                <th class="col-size" data-i18n="messages.size">Tamaño</th>
+                <th class="col-from" data-i18n="messages.from">De</th>
+                <th class="col-to" data-i18n="messages.to">Para</th>
+                <th class="col-route" data-i18n="messages.route">Ruta</th>
+                <th class="col-subject" data-i18n="messages.subject">Asunto</th>
+                <th class="col-date" data-i18n="messages.date">Fecha</th>
               </tr>
             </thead>
             <tbody id="messages-body"></tbody>

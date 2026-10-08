@@ -208,6 +208,20 @@
     }).format(new Date(Number(seconds) * 1000));
   }
 
+  function formatCompactDate(seconds) {
+    if (!seconds) return "—";
+    const parts = new Intl.DateTimeFormat(state.language, {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: "UTC"
+    }).formatToParts(new Date(Number(seconds) * 1000));
+    const value = (type) => parts.find((part) => part.type === type).value;
+    return `${value("month")}${value("day")}/${value("hour")}${value("minute")}`;
+  }
+
   async function loadSession() {
     try {
       const data = await request("/api/me");
@@ -271,24 +285,98 @@
     $("#messages-empty").hidden = messages.length !== 0;
     messages.forEach((message) => {
       const row = document.createElement("tr");
-      [message.number, message.type, message.status, message.from || "—", message.to || "—"].forEach((value) => {
-        const cell = document.createElement("td");
-        cell.textContent = value;
-        row.appendChild(cell);
+
+      const from = String(message.from || "").trim();
+      const to = String(message.to || "").trim();
+      const route = formatMessageRoute(message.route);
+      const title = String(message.title || "").trim() || "(sin asunto)";
+      const size = Number(message.size);
+      const sizeLabel = Number.isFinite(size) && size >= 0 ? formatBytes(size) : "—";
+      const compactSizeLabel = Number.isFinite(size) && size >= 0 ? formatCompactBytes(size) : "—";
+      const dateLabel = formatDate(message.date);
+      const compactDateLabel = formatCompactDate(message.date);
+
+      [
+        ["col-number", message.number],
+        ["col-type", message.type],
+        ["col-status", message.status],
+        ["col-size", sizeLabel, sizeLabel],
+        ["col-from", from, from],
+        ["col-to", to, to],
+        ["col-route", route.label, route.full]
+      ].forEach(([className, value, fullValue]) => {
+        row.appendChild(createMessageCell(className, value, fullValue));
       });
+
       const subject = document.createElement("td");
-      const button = document.createElement("button");
-      button.className = "table-link";
-      button.type = "button";
-      button.textContent = message.title || "(sin asunto)";
-      button.addEventListener("click", () => loadMessage(message.number));
-      subject.appendChild(button);
+      subject.className = "message-desktop-cell col-subject";
+      subject.appendChild(createMessageLink(title, message.number));
       row.appendChild(subject);
-      const date = document.createElement("td");
-      date.textContent = formatDate(message.date);
+
+      const date = createMessageCell("col-date", dateLabel, dateLabel);
       row.appendChild(date);
+
+      const mobileCell = document.createElement("td");
+      mobileCell.className = "message-mobile-cell";
+      mobileCell.colSpan = 9;
+      const mobileEntry = document.createElement("div");
+      mobileEntry.className = "message-mobile-entry";
+      const mobileMeta = document.createElement("div");
+      mobileMeta.className = "message-mobile-meta";
+      mobileMeta.append(
+        createMobileMessageValue("message-mobile-number", message.number),
+        createMobileMessageValue("message-mobile-type-status", `${message.type || "—"}·${message.status || "—"}`),
+        createMobileMessageValue("message-mobile-size", compactSizeLabel, sizeLabel)
+      );
+      const address = from && to ? `${from} → ${to}` : from || to;
+      if (address) mobileMeta.appendChild(createMobileMessageValue("message-mobile-address", address, address));
+      if (route.label) mobileMeta.appendChild(createMobileMessageValue("message-mobile-route", route.label, route.full));
+      mobileMeta.appendChild(createMobileMessageValue("message-mobile-date", compactDateLabel, dateLabel));
+      mobileEntry.appendChild(mobileMeta);
+      const mobileSubject = document.createElement("div");
+      mobileSubject.className = "message-mobile-subject";
+      mobileSubject.appendChild(createMessageLink(title, message.number));
+      mobileEntry.appendChild(mobileSubject);
+      mobileCell.appendChild(mobileEntry);
+      row.appendChild(mobileCell);
+
       body.appendChild(row);
     });
+  }
+
+  function createMessageCell(className, value, fullValue) {
+    const cell = document.createElement("td");
+    cell.className = `message-desktop-cell ${className}`;
+    const text = value == null ? "" : String(value).trim();
+    cell.textContent = text || "—";
+    if (!text) cell.classList.add("is-empty");
+    if (fullValue) cell.title = fullValue;
+    return cell;
+  }
+
+  function createMessageLink(title, number) {
+    const button = document.createElement("button");
+    button.className = "table-link";
+    button.type = "button";
+    button.textContent = title;
+    button.title = title;
+    button.addEventListener("click", () => loadMessage(number));
+    return button;
+  }
+
+  function createMobileMessageValue(className, value, fullValue) {
+    const element = document.createElement("span");
+    element.className = className;
+    element.textContent = value == null ? "" : String(value);
+    if (fullValue) element.title = fullValue;
+    return element;
+  }
+
+  function formatMessageRoute(route) {
+    const value = String(route || "").trim().replace(/^@/, "").trim();
+    if (!value) return { label: "", full: "" };
+    const full = `@${value}`;
+    return { label: `@${value.split(".")[0]}`, full };
   }
 
   async function loadMessage(number, options) {
@@ -312,7 +400,8 @@
     $("#detail-title").textContent = `#${message.number} · ${message.title || "(sin asunto)"}`;
     const meta = $("#detail-meta");
     meta.replaceChildren();
-    [["messages.detailFrom", message.from || "—"], ["messages.detailTo", message.to || "—"], ["messages.detailType", message.type], ["messages.detailStatus", message.status], ["messages.detailDate", formatDate(message.date)]].forEach(([key, value]) => {
+    const route = formatMessageRoute(message.route);
+    [["messages.detailFrom", message.from || "—"], ["messages.detailTo", message.to || "—"], ["messages.route", route.full || "—"], ["messages.detailType", message.type], ["messages.detailStatus", message.status], ["messages.detailDate", formatDate(message.date)]].forEach(([key, value]) => {
       const term = document.createElement("dt");
       term.textContent = translate(key);
       const description = document.createElement("dd");
@@ -637,6 +726,12 @@
     if (size < 1024) return `${size} B`;
     if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function formatCompactBytes(size) {
+    if (size < 1024) return `${size}B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)}K`;
+    return `${(size / (1024 * 1024)).toFixed(1)}M`;
   }
 
   function handleHistoryNavigation() {
