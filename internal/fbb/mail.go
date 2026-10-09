@@ -10,10 +10,11 @@ import (
 	"syscall"
 )
 
-// MessageBody contains the routing headers and plain-text body stored in an
-// m_XXXXXX.mes file.
+// MessageBody contains the routing headers, simplified BBS path, and plain-text
+// body stored in an m_XXXXXX.mes file.
 type MessageBody struct {
 	Routing []string `json:"routing"`
+	Path    []string `json:"path"`
 	Body    string   `json:"body"`
 }
 
@@ -49,7 +50,39 @@ func parseMessageBody(value string) MessageBody {
 	// A final line ending is a file-format detail rather than part of the
 	// visible message. Preserve all other whitespace exactly.
 	body = strings.TrimSuffix(body, "\n")
-	return MessageBody{Routing: routing, Body: body}
+	return MessageBody{Routing: routing, Path: routingPath(routing), Body: body}
+}
+
+func routingPath(routing []string) []string {
+	path := make([]string, 0, len(routing))
+	for _, line := range routing {
+		callsign := routingCallsign(line)
+		if callsign != "" {
+			path = append(path, callsign)
+		}
+	}
+	return path
+}
+
+func routingCallsign(line string) string {
+	at := strings.IndexByte(line, '@')
+	if at < 0 {
+		return ""
+	}
+	address := strings.TrimPrefix(line[at+1:], ":")
+	end := 0
+	for end < len(address) {
+		character := address[end]
+		if character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' || character >= '0' && character <= '9' || character == '-' {
+			end++
+			continue
+		}
+		break
+	}
+	if end == 0 {
+		return ""
+	}
+	return strings.ToUpper(address[:end])
 }
 
 // ComposeRequest is the validated logical representation of an outgoing FBB

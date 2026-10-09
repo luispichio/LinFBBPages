@@ -127,6 +127,7 @@ At startup, for `inf.sys` and `dirmes.sys`:
 
 - One file per message: `mail/mail<N>/m_%06d.mes` where **N = number % 10** (validated: `m_000110` is in `mail0`).
 - Text content: zero or more routing-header lines `R:AAMMDD/hhmmZ ...`, then a blank line, then the body. Parse `R:` lines as headers and the remainder as plain text.
+- The message-detail API also exposes `path`: BBS callsigns taken after `@` or `@:` (up to the next dot) from the `R:` lines, in their original order.
 - `mail/mail.in` may exist (FBB import queue): **never expose it as a message**.
 
 ### Sending messages — `mail/mail.in`
@@ -157,8 +158,8 @@ JSON; a session cookie is required for every endpoint except `/api/login`. The a
 | POST | `/api/login` | `{callsign, password}` → validates against `inf.sys`, sets a cookie. |
 | POST | `/api/logout` | Invalidates the session. |
 | GET | `/api/me` | Logged-in user data (callsign, name, QTH, `sysop`). |
-| GET | `/api/messages` | Paginated visibility-filtered list from `dirmes.sys`. Query: `type`, `q` (title), `page`, `page_size` (default 50). Order: descending number. |
-| GET | `/api/messages/{num}` | Metadata + `R:` headers + body from `mail/` when visible to the user. Returns 404 if it does not exist or is not visible. |
+| GET | `/api/messages` | Paginated visibility-filtered list from `dirmes.sys`. Query: `type`, `q` (title, sender, recipient, route), `page`, `page_size` (default 50). Order: descending number. |
+| GET | `/api/messages/{num}` | Metadata + `R:` headers + simplified BBS `path` + body from `mail/` when visible to the user. Returns 404 if it does not exist or is not visible. |
 | POST | `/api/messages` | Compose: `{to, route, type: P|B, title, body}` → append to `mail.in`. Immediate response; asynchronous import (~1 min). |
 | GET | `/api/files` | Files from `7pfbb/ok/` grouped by basename (main + auxiliary). |
 | GET | `/api/files/{name}` | Serves a file (inline for images). **Sanitize against path traversal.** |

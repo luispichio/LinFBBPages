@@ -7,6 +7,8 @@
     page: 1,
     totalPages: 1,
     view: "messages-view",
+    detail: null,
+    composeContext: null,
     files: {
       groups: [],
       sort: ["date", "name", "type"].includes(localStorage.getItem("linfbb_files_sort")) ? localStorage.getItem("linfbb_files_sort") : "date",
@@ -90,6 +92,7 @@
     if (state.user) {
       renderUser();
     }
+    renderComposeContext();
   }
 
   function setLanguage(language) {
@@ -316,9 +319,14 @@
       const date = createMessageCell("col-date", dateLabel, dateLabel);
       row.appendChild(date);
 
+      const actionCell = document.createElement("td");
+      actionCell.className = "message-desktop-cell col-actions";
+      actionCell.appendChild(createMessageActions(message));
+      row.appendChild(actionCell);
+
       const mobileCell = document.createElement("td");
       mobileCell.className = "message-mobile-cell";
-      mobileCell.colSpan = 9;
+      mobileCell.colSpan = 10;
       const mobileEntry = document.createElement("div");
       mobileEntry.className = "message-mobile-entry";
       const mobileMeta = document.createElement("div");
@@ -336,6 +344,7 @@
       const mobileSubject = document.createElement("div");
       mobileSubject.className = "message-mobile-subject";
       mobileSubject.appendChild(createMessageLink(title, message.number));
+      mobileSubject.appendChild(createMessageActions(message));
       mobileEntry.appendChild(mobileSubject);
       mobileCell.appendChild(mobileEntry);
       row.appendChild(mobileCell);
@@ -361,6 +370,29 @@
     button.textContent = title;
     button.title = title;
     button.addEventListener("click", () => loadMessage(number));
+    return button;
+  }
+
+  function createMessageActions(message) {
+    const actions = document.createElement("div");
+    actions.className = "message-row-actions";
+    actions.append(
+      createMessageActionButton("reply", message),
+      createMessageActionButton("copy", message)
+    );
+    return actions;
+  }
+
+  function createMessageActionButton(action, message) {
+    const button = document.createElement("button");
+    const key = action === "reply" ? "messages.reply" : "messages.copy";
+    const shortKey = action === "reply" ? "messages.replyShort" : "messages.copyShort";
+    button.className = "message-action";
+    button.type = "button";
+    button.textContent = translate(shortKey);
+    button.title = translate(key);
+    button.setAttribute("aria-label", translate(key));
+    button.addEventListener("click", () => loadMessageForCompose(action, message));
     return button;
   }
 
@@ -396,7 +428,17 @@
     }
   }
 
+  async function loadMessageForCompose(action, message) {
+    try {
+      const data = await request(`/api/messages/${encodeURIComponent(message.number)}`);
+      openMessageCompose(action, data.message || message, data.body || { body: "" });
+    } catch (error) {
+      handleError(error);
+    }
+  }
+
   function renderMessageDetail(message, body) {
+    state.detail = { message, body: body || { body: "" } };
     $("#detail-title").textContent = `#${message.number} · ${message.title || "(sin asunto)"}`;
     const meta = $("#detail-meta");
     meta.replaceChildren();
@@ -424,6 +466,82 @@
       routing.textContent = translate("notices.noRouting");
     }
     $("#detail-body").textContent = body && body.body ? body.body : "";
+  }
+
+  function openDetailMessageCompose(action) {
+    if (!state.detail) return;
+    openMessageCompose(action, state.detail.message, state.detail.body);
+  }
+
+  function openMessageCompose(action, message, body) {
+    const form = $("#compose-form");
+    form.reset();
+    hideBanner("#compose-error");
+
+    const originalTitle = String(message.title || "").trim() || "(sin asunto)";
+    const bodyText = body && typeof body.body === "string" ? body.body : "";
+    const copiedTitle = `CP ${state.user ? state.user.callsign : ""}: ${originalTitle}`;
+    const title = action === "reply" ? `Re: ${originalTitle}` : copiedTitle;
+    const titleInput = form.querySelector('[name="title"]');
+    const bodyInput = form.querySelector('[name="body"]');
+    const recipientInput = form.querySelector('[name="to"]');
+    form.querySelector('[name="type"]').value = "P";
+    recipientInput.value = action === "reply" ? (message.from || "") : "";
+    form.querySelector('[name="route"]').value = "";
+    titleInput.value = title.slice(0, titleInput.maxLength);
+    bodyInput.value = action === "reply" ? quoteMessageBody(bodyText) : copiedMessageBody(message, body, bodyText);
+
+    state.composeContext = {
+      key: action === "reply" ? "compose.replyContext" : "compose.copyContext",
+      number: message.number
+    };
+    renderComposeContext();
+    setView("compose-view");
+
+    const focusTarget = action === "reply" ? bodyInput : recipientInput;
+    focusTarget.focus();
+    if (action === "reply") focusTarget.setSelectionRange(0, 0);
+  }
+
+  function quoteMessageBody(body) {
+    if (!body) return "";
+    const quoted = String(body).replace(/\r\n?/g, "\n").split("\n").map((line) => `> ${line}`).join("\n");
+    return `\n\n${quoted}`;
+  }
+
+  function copiedMessageBody(message, body, originalBody) {
+    const details = [];
+    const path = body && Array.isArray(body.path)
+      ? body.path.map((callsign) => String(callsign || "").trim()).filter(Boolean)
+      : [];
+    if (path.length) details.push(`Path: !${path.join("!")}!`);
+
+    const recipient = String(message.to || "").trim();
+    if (recipient) {
+      const route = formatMessageRoute(message.route).label;
+      const destination = route && !recipient.includes("@") ? `${recipient}${route}` : recipient;
+      details.push(`Original to ${destination}`);
+    }
+
+    if (!details.length) return originalBody;
+    return `${details.join("\n")}\n\n${originalBody}`;
+  }
+
+  function renderComposeContext() {
+    const context = $("#compose-context");
+    if (!context) return;
+    if (!state.composeContext) {
+      context.hidden = true;
+      context.textContent = "";
+      return;
+    }
+    context.textContent = format(state.composeContext.key, { number: state.composeContext.number });
+    context.hidden = false;
+  }
+
+  function clearComposeContext() {
+    state.composeContext = null;
+    renderComposeContext();
   }
 
   async function submitCompose(event) {
@@ -748,7 +866,10 @@
     $("#logout-button").addEventListener("click", logout);
     $("#login-language").addEventListener("change", (event) => setLanguage(event.target.value));
     $("#app-language").addEventListener("change", (event) => setLanguage(event.target.value));
-    document.querySelectorAll(".tab").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
+    document.querySelectorAll(".tab").forEach((button) => button.addEventListener("click", () => {
+      if (button.dataset.view === "compose-view") clearComposeContext();
+      setView(button.dataset.view);
+    }));
     window.addEventListener("popstate", handleHistoryNavigation);
     $("#message-filters").addEventListener("submit", (event) => {
       event.preventDefault();
@@ -759,7 +880,13 @@
     $("#previous-page").addEventListener("click", () => { if (state.page > 1) { state.page--; loadMessages(); } });
     $("#next-page").addEventListener("click", () => { if (state.page < state.totalPages) { state.page++; loadMessages(); } });
     $("#close-detail").addEventListener("click", () => setView("messages-view"));
+    $("#detail-reply").addEventListener("click", () => openDetailMessageCompose("reply"));
+    $("#detail-copy").addEventListener("click", () => openDetailMessageCompose("copy"));
     $("#compose-form").addEventListener("submit", submitCompose);
+    $("#compose-form").addEventListener("reset", () => {
+      clearComposeContext();
+      hideBanner("#compose-error");
+    });
     $("#refresh-files").addEventListener("click", loadFiles);
     $("#files-search").addEventListener("input", (event) => {
       state.files.query = event.target.value;

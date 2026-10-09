@@ -205,9 +205,38 @@ func TestComposeValidationAndBodyParsing(t *testing.T) {
 	if err := (ComposeRequest{Type: "P", To: "LW6DIO", Title: "Hello", Body: "bad\n/EX"}).Validate(); err == nil {
 		t.Fatal("/EX body line accepted")
 	}
-	body := parseMessageBody("R:260925/0959Z route\nR:260925/0958Z route2\n\nHello\nworld\n")
-	if len(body.Routing) != 2 || body.Body != "Hello\nworld" {
+	body := parseMessageBody("R:260925/0959Z @:LU4ECL.LP.BA.ARG.SOAM #4168\nR:260925/0958Z 24046@VK2RZ.#SYD.NSW.AUS.OC\nR:260925/0957Z route-without-address\n\nHello\nworld\n")
+	if len(body.Routing) != 3 || body.Body != "Hello\nworld" {
 		t.Fatalf("unexpected parsed body: %+v", body)
+	}
+	wantPath := []string{"LU4ECL", "VK2RZ"}
+	if len(body.Path) != len(wantPath) {
+		t.Fatalf("path = %v, want %v", body.Path, wantPath)
+	}
+	for index, callsign := range wantPath {
+		if body.Path[index] != callsign {
+			t.Fatalf("path = %v, want %v", body.Path, wantPath)
+		}
+	}
+}
+
+func TestMessageBodyPathFromFixture(t *testing.T) {
+	store, err := NewStore(fixtureRoot(t), Arch32Mode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := store.ReadMessageBody(114)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPath := []string{"LU4ECL", "IW8PGT", "HB9ON", "DK0WUE", "PI8ZTM", "PY2BIL", "HB9ON", "IR0AAB"}
+	if len(body.Path) != len(wantPath) {
+		t.Fatalf("path = %v, want %v", body.Path, wantPath)
+	}
+	for index, callsign := range wantPath {
+		if body.Path[index] != callsign {
+			t.Fatalf("path = %v, want %v", body.Path, wantPath)
+		}
 	}
 }
 

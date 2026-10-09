@@ -68,7 +68,7 @@
         <form id="message-filters" class="filters">
           <label>
             <span data-i18n="messages.search">Buscar</span>
-            <input name="q" type="search" data-i18n-placeholder="messages.searchPlaceholder" placeholder="Título, origen o destino">
+            <input name="q" type="search" data-i18n-placeholder="messages.searchPlaceholder" placeholder="Título, origen, destino o ruta">
           </label>
           <label>
             <span data-i18n="messages.type">Tipo</span>
@@ -94,6 +94,7 @@
                 <th class="col-route" data-i18n="messages.route">Ruta</th>
                 <th class="col-subject" data-i18n="messages.subject">Asunto</th>
                 <th class="col-date" data-i18n="messages.date">Fecha</th>
+                <th class="col-actions" data-i18n="messages.actions">Acciones</th>
               </tr>
             </thead>
             <tbody id="messages-body"></tbody>
@@ -115,6 +116,10 @@
           </div>
         </div>
         <dl id="detail-meta" class="message-meta"></dl>
+        <div class="detail-actions">
+          <button id="detail-reply" class="secondary" type="button" data-i18n="messages.reply">Responder</button>
+          <button id="detail-copy" class="secondary" type="button" data-i18n="messages.copy">Copiar</button>
+        </div>
         <div id="detail-routing" class="routing"></div>
         <pre id="detail-body" class="message-body"></pre>
       </section>
@@ -124,6 +129,7 @@
           <div>
             <h2 data-i18n="compose.title">Redactar mensaje</h2>
             <p class="muted" data-i18n="compose.subtitle">FBB lo importará desde mail.in aproximadamente en un minuto.</p>
+            <p id="compose-context" class="compose-context" role="status" hidden></p>
           </div>
         </div>
         <form id="compose-form" class="compose-form">

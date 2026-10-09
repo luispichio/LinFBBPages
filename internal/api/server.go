@@ -244,7 +244,7 @@ func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 		if typeFilter != "" && message.Type != typeFilter {
 			continue
 		}
-		if textFilter != "" && !strings.Contains(strings.ToLower(message.Title), textFilter) && !strings.Contains(strings.ToLower(message.From), textFilter) && !strings.Contains(strings.ToLower(message.To), textFilter) {
+		if textFilter != "" && !strings.Contains(strings.ToLower(message.Title), textFilter) && !strings.Contains(strings.ToLower(message.From), textFilter) && !strings.Contains(strings.ToLower(message.To), textFilter) && !strings.Contains(strings.ToLower(message.Route), textFilter) {
 			continue
 		}
 		filtered = append(filtered, message)
